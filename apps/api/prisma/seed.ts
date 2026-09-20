@@ -5,7 +5,7 @@
  * тесты фильтров и скриншоты воспроизводимы. Перед наполнением таблицы
  * очищаются, так что сид можно гонять сколько угодно раз.
  */
-import { Prisma, PrismaClient } from '@prisma/client';
+import { type Prisma, type PrismaClient } from '@prisma/client';
 
 import { CITIES } from '@vk-rideshare/shared';
 
