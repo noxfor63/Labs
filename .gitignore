@@ -1,0 +1,18 @@
+node_modules/
+dist/
+build/
+coverage/
+.vite/
+*.tsbuildinfo
+
+# Секреты — никогда в репозиторий
+.env
+.env.*
+!.env.example
+
+# Прочее
+.DS_Store
+*.log
+npm-debug.log*
+.idea/
+.vscode/

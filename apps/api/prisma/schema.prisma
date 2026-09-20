@@ -1,0 +1,120 @@
+// Схема БД мини-приложения «Поиск попутчиков».
+//
+// Все денежные значения — целые рубли. Все временные метки — UTC.
+// vkUserId — первичный ключ пользователя: он же приходит в launch-параметрах,
+// поэтому суррогатный id здесь только мешал бы.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// В Prisma 7 строка подключения живёт в prisma.config.ts (для CLI)
+// и передаётся в PrismaClient драйвер-адаптером (для рантайма).
+datasource db {
+  provider = "postgresql"
+}
+
+/// Роль автора объявления.
+enum TripRole {
+  /// Автор за рулём и предлагает места.
+  DRIVER
+  /// Автор ищет, кто его подвезёт.
+  PASSENGER
+}
+
+enum TripStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum RequestStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
+}
+
+/// Кэш профиля из ВКонтакте. Обновляется на каждом POST /api/session.
+model User {
+  vkUserId    BigInt   @id
+  firstName   String
+  lastName    String
+  photoUrl    String?
+  city        String?
+  /// Средняя оценка по полученным отзывам; пересчитывается в транзакции отзыва.
+  ratingAvg   Float    @default(0)
+  ratingCount Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  trips          Trip[]        @relation("TripAuthor")
+  requests       TripRequest[]
+  reviewsWritten Review[]      @relation("ReviewAuthor")
+  reviewsGot     Review[]      @relation("ReviewTarget")
+
+  @@map("users")
+}
+
+model Trip {
+  id         String     @id @default(cuid())
+  authorVkId BigInt
+  role       TripRole
+  fromCity   String
+  fromPoint  String?
+  toCity     String
+  toPoint    String?
+  departAt   DateTime
+  seatsTotal Int
+  /// Уменьшается только условным UPDATE ... WHERE seatsLeft > 0 внутри транзакции.
+  seatsLeft  Int
+  priceRub   Int?
+  carModel   String?
+  comment    String?
+  status     TripStatus @default(ACTIVE)
+  createdAt  DateTime   @default(now())
+
+  author   User          @relation("TripAuthor", fields: [authorVkId], references: [vkUserId], onDelete: Cascade)
+  requests TripRequest[]
+  reviews  Review[]
+
+  @@index([fromCity, toCity, departAt])
+  @@index([status])
+  @@index([authorVkId, status])
+  @@index([departAt, id])
+  @@map("trips")
+}
+
+model TripRequest {
+  id        String        @id @default(cuid())
+  tripId    String
+  userVkId  BigInt
+  status    RequestStatus @default(PENDING)
+  message   String?
+  createdAt DateTime      @default(now())
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userVkId], references: [vkUserId], onDelete: Cascade)
+
+  @@unique([tripId, userVkId])
+  @@index([userVkId, status])
+  @@map("trip_requests")
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  tripId     String
+  authorVkId BigInt
+  targetVkId BigInt
+  /// 1..5 — проверяется Zod-схемой на входе.
+  rating     Int
+  text       String?
+  createdAt  DateTime @default(now())
+
+  trip   Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  author User @relation("ReviewAuthor", fields: [authorVkId], references: [vkUserId], onDelete: Cascade)
+  target User @relation("ReviewTarget", fields: [targetVkId], references: [vkUserId], onDelete: Cascade)
+
+  @@unique([tripId, authorVkId, targetVkId])
+  @@index([targetVkId])
+  @@map("reviews")
+}
