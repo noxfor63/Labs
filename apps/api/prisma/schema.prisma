@@ -67,7 +67,8 @@ model Trip {
   seatsTotal Int
   /// Уменьшается только условным UPDATE ... WHERE seatsLeft > 0 внутри транзакции.
   seatsLeft  Int
-  priceRub   Int?
+  /// Цена за место. Обязательна: коридор задан продуктом (см. LIMITS).
+  priceRub   Int
   carModel   String?
   comment    String?
   status     TripStatus @default(ACTIVE)

@@ -38,9 +38,9 @@ describe('склонение и форматирование', () => {
     expect(pluralize(15, forms)).toBe('много');
   });
 
-  it('цена: null означает «не указана»', () => {
-    expect(formatPrice(null)).toBe('Цена не указана');
-    expect(formatPrice(0)).toContain('0');
+  it('цена печатается с рублём и разрядами', () => {
+    expect(formatPrice(500)).toBe('500 ₽');
+    expect(formatPrice(850)).toBe('850 ₽');
     expect(formatPrice(1500)).toContain('₽');
   });
 

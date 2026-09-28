@@ -1,9 +1,9 @@
 /**
- * Статический справочник городов России.
+ * Справочник городов и направлений.
  *
- * Внешних API и геокодинга нет по условию задачи: список фиксированный,
- * около 100 крупнейших городов. Поездка хранит каноническое `name` отсюда,
- * поэтому фильтр «откуда/куда» — точное совпадение строки, а не поиск.
+ * Приложение обслуживает не всю страну, а три города Оренбургской области
+ * и шесть направлений между ними. Набор фиксированный и закрытый: и поиск,
+ * и создание поездки проверяются по нему, произвольный город ввести нельзя.
  */
 
 export type City = {
@@ -13,115 +13,40 @@ export type City = {
   readonly name: string;
 };
 
+export const ORENBURG = 'Оренбург';
+export const SOL_ILETSK = 'Соль-Илецк';
+export const AKBULAK = 'Акбулак';
+
 export const CITIES: readonly City[] = [
-  { id: 'moskva', name: 'Москва' },
-  { id: 'sankt-peterburg', name: 'Санкт-Петербург' },
-  { id: 'novosibirsk', name: 'Новосибирск' },
-  { id: 'ekaterinburg', name: 'Екатеринбург' },
-  { id: 'kazan', name: 'Казань' },
-  { id: 'nizhniy-novgorod', name: 'Нижний Новгород' },
-  { id: 'krasnoyarsk', name: 'Красноярск' },
-  { id: 'chelyabinsk', name: 'Челябинск' },
-  { id: 'samara', name: 'Самара' },
-  { id: 'ufa', name: 'Уфа' },
-  { id: 'rostov-na-donu', name: 'Ростов-на-Дону' },
-  { id: 'krasnodar', name: 'Краснодар' },
-  { id: 'omsk', name: 'Омск' },
-  { id: 'voronezh', name: 'Воронеж' },
-  { id: 'perm', name: 'Пермь' },
-  { id: 'volgograd', name: 'Волгоград' },
-  { id: 'saratov', name: 'Саратов' },
-  { id: 'tyumen', name: 'Тюмень' },
-  { id: 'tolyatti', name: 'Тольятти' },
-  { id: 'makhachkala', name: 'Махачкала' },
-  { id: 'barnaul', name: 'Барнаул' },
-  { id: 'izhevsk', name: 'Ижевск' },
-  { id: 'khabarovsk', name: 'Хабаровск' },
-  { id: 'ulyanovsk', name: 'Ульяновск' },
-  { id: 'irkutsk', name: 'Иркутск' },
-  { id: 'vladivostok', name: 'Владивосток' },
-  { id: 'yaroslavl', name: 'Ярославль' },
-  { id: 'sevastopol', name: 'Севастополь' },
-  { id: 'stavropol', name: 'Ставрополь' },
-  { id: 'naberezhnye-chelny', name: 'Набережные Челны' },
-  { id: 'tomsk', name: 'Томск' },
-  { id: 'balashikha', name: 'Балашиха' },
-  { id: 'kemerovo', name: 'Кемерово' },
-  { id: 'novokuznetsk', name: 'Новокузнецк' },
-  { id: 'ryazan', name: 'Рязань' },
-  { id: 'astrakhan', name: 'Астрахань' },
-  { id: 'penza', name: 'Пенза' },
-  { id: 'lipetsk', name: 'Липецк' },
-  { id: 'tula', name: 'Тула' },
-  { id: 'kirov', name: 'Киров' },
-  { id: 'cheboksary', name: 'Чебоксары' },
-  { id: 'kaliningrad', name: 'Калининград' },
-  { id: 'kursk', name: 'Курск' },
-  { id: 'ulan-ude', name: 'Улан-Удэ' },
-  { id: 'sochi', name: 'Сочи' },
-  { id: 'surgut', name: 'Сургут' },
-  { id: 'tver', name: 'Тверь' },
-  { id: 'magnitogorsk', name: 'Магнитогорск' },
-  { id: 'bryansk', name: 'Брянск' },
-  { id: 'ivanovo', name: 'Иваново' },
-  { id: 'belgorod', name: 'Белгород' },
-  { id: 'nizhniy-tagil', name: 'Нижний Тагил' },
-  { id: 'arkhangelsk', name: 'Архангельск' },
-  { id: 'vladimir', name: 'Владимир' },
-  { id: 'chita', name: 'Чита' },
-  { id: 'kaluga', name: 'Калуга' },
-  { id: 'simferopol', name: 'Симферополь' },
-  { id: 'smolensk', name: 'Смоленск' },
-  { id: 'volzhskiy', name: 'Волжский' },
-  { id: 'yakutsk', name: 'Якутск' },
-  { id: 'saransk', name: 'Саранск' },
-  { id: 'kurgan', name: 'Курган' },
-  { id: 'orel', name: 'Орёл' },
-  { id: 'podolsk', name: 'Подольск' },
-  { id: 'groznyy', name: 'Грозный' },
-  { id: 'vologda', name: 'Вологда' },
-  { id: 'cherepovets', name: 'Череповец' },
-  { id: 'vladikavkaz', name: 'Владикавказ' },
-  { id: 'murmansk', name: 'Мурманск' },
-  { id: 'tambov', name: 'Тамбов' },
-  { id: 'sterlitamak', name: 'Стерлитамак' },
-  { id: 'petrozavodsk', name: 'Петрозаводск' },
-  { id: 'kostroma', name: 'Кострома' },
-  { id: 'nizhnevartovsk', name: 'Нижневартовск' },
-  { id: 'novorossiysk', name: 'Новороссийск' },
-  { id: 'yoshkar-ola', name: 'Йошкар-Ола' },
-  { id: 'khimki', name: 'Химки' },
-  { id: 'taganrog', name: 'Таганрог' },
-  { id: 'komsomolsk-na-amure', name: 'Комсомольск-на-Амуре' },
-  { id: 'syktyvkar', name: 'Сыктывкар' },
-  { id: 'nalchik', name: 'Нальчик' },
-  { id: 'nizhnekamsk', name: 'Нижнекамск' },
-  { id: 'shakhty', name: 'Шахты' },
-  { id: 'dzerzhinsk', name: 'Дзержинск' },
-  { id: 'orsk', name: 'Орск' },
-  { id: 'bratsk', name: 'Братск' },
-  { id: 'blagoveshchensk', name: 'Благовещенск' },
-  { id: 'engels', name: 'Энгельс' },
-  { id: 'angarsk', name: 'Ангарск' },
-  { id: 'korolev', name: 'Королёв' },
-  { id: 'velikiy-novgorod', name: 'Великий Новгород' },
-  { id: 'staryy-oskol', name: 'Старый Оскол' },
-  { id: 'mytishchi', name: 'Мытищи' },
-  { id: 'pskov', name: 'Псков' },
-  { id: 'lyubertsy', name: 'Люберцы' },
-  { id: 'biysk', name: 'Бийск' },
-  { id: 'yuzhno-sakhalinsk', name: 'Южно-Сахалинск' },
-  { id: 'armavir', name: 'Армавир' },
-  { id: 'rybinsk', name: 'Рыбинск' },
-  { id: 'prokopevsk', name: 'Прокопьевск' },
+  { id: 'orenburg', name: ORENBURG },
+  { id: 'sol-iletsk', name: SOL_ILETSK },
+  { id: 'akbulak', name: AKBULAK },
 ] as const;
 
-const CITY_BY_NAME: ReadonlyMap<string, City> = new Map(CITIES.map((c) => [c.name, c]));
-const CITY_BY_ID: ReadonlyMap<string, City> = new Map(CITIES.map((c) => [c.id, c]));
+/** Направление: строго упорядоченная пара «откуда → куда». */
+export type Route = {
+  readonly from: string;
+  readonly to: string;
+};
 
-/** Города, отсортированные по названию — для выпадающих списков. */
-export const CITIES_ALPHABETICAL: readonly City[] = [...CITIES].sort((a, b) =>
-  a.name.localeCompare(b.name, 'ru'),
+/**
+ * Все допустимые направления. Каждая пара городов доступна в обе стороны,
+ * поэтому маршрутов шесть, а не три.
+ */
+export const ROUTES: readonly Route[] = [
+  { from: ORENBURG, to: SOL_ILETSK },
+  { from: SOL_ILETSK, to: ORENBURG },
+  { from: ORENBURG, to: AKBULAK },
+  { from: AKBULAK, to: ORENBURG },
+  { from: AKBULAK, to: SOL_ILETSK },
+  { from: SOL_ILETSK, to: AKBULAK },
+] as const;
+
+const CITY_BY_NAME: ReadonlyMap<string, City> = new Map(CITIES.map((city) => [city.name, city]));
+const CITY_BY_ID: ReadonlyMap<string, City> = new Map(CITIES.map((city) => [city.id, city]));
+
+const ROUTE_KEYS: ReadonlySet<string> = new Set(
+  ROUTES.map((route) => `${route.from}→${route.to}`),
 );
 
 export function isKnownCity(name: string): boolean {
@@ -136,21 +61,21 @@ export function findCityById(id: string): City | undefined {
   return CITY_BY_ID.get(id);
 }
 
-/** Подсказки в поле ввода: регистронезависимое вхождение подстроки. */
-export function searchCities(query: string, limit = 10): readonly City[] {
-  const needle = query.trim().toLowerCase();
-  if (needle === '') {
-    return CITIES.slice(0, limit);
-  }
-  const startsWith: City[] = [];
-  const contains: City[] = [];
-  for (const city of CITIES_ALPHABETICAL) {
-    const haystack = city.name.toLowerCase();
-    if (haystack.startsWith(needle)) {
-      startsWith.push(city);
-    } else if (haystack.includes(needle)) {
-      contains.push(city);
-    }
-  }
-  return [...startsWith, ...contains].slice(0, limit);
+/** Существует ли такое направление. Порядок городов важен. */
+export function isKnownRoute(from: string, to: string): boolean {
+  return ROUTE_KEYS.has(`${from}→${to}`);
+}
+
+/**
+ * Куда можно уехать из города. Форма создания поездки сужает по этому
+ * списку выбор «куда», чтобы невозможный маршрут нельзя было и собрать.
+ */
+export function destinationsFrom(from: string): readonly City[] {
+  const names = ROUTES.filter((route) => route.from === from).map((route) => route.to);
+  return CITIES.filter((city) => names.includes(city.name));
+}
+
+/** Человекочитаемое направление для заголовков и подписей. */
+export function formatRoute(from: string, to: string): string {
+  return `${from} → ${to}`;
 }

@@ -7,14 +7,14 @@ import { TripCard } from '../src/components/TripCard.js';
 const trip = (overrides: Partial<TripSummary> = {}): TripSummary => ({
   id: 'trip-1',
   role: 'DRIVER',
-  fromCity: 'Москва',
+  fromCity: 'Оренбург',
   fromPoint: null,
-  toCity: 'Тула',
+  toCity: 'Соль-Илецк',
   toPoint: null,
   departAt: new Date('2026-10-01T09:30:00.000Z').toISOString(),
   seatsTotal: 3,
   seatsLeft: 2,
-  priceRub: 900,
+  priceRub: 600,
   carModel: 'Lada Vesta',
   comment: null,
   status: 'ACTIVE',
@@ -24,7 +24,7 @@ const trip = (overrides: Partial<TripSummary> = {}): TripSummary => ({
     firstName: 'Анна',
     lastName: 'Ковалёва',
     photoUrl: null,
-    city: 'Москва',
+    city: 'Оренбург',
     ratingAvg: 4.6,
     ratingCount: 11,
   },
@@ -35,15 +35,15 @@ describe('карточка поездки', () => {
   it('показывает маршрут, автора и число свободных мест', () => {
     render(<TripCard trip={trip()} onClick={() => undefined} />);
 
-    expect(screen.getByText(/Москва → Тула/)).toBeTruthy();
+    expect(screen.getByText(/Оренбург → Соль-Илецк/)).toBeTruthy();
     expect(screen.getByText('Анна Ковалёва')).toBeTruthy();
     expect(screen.getByText(/Свободно 2 места/)).toBeTruthy();
-    expect(screen.getByText(/900/)).toBeTruthy();
+    expect(screen.getByText(/600/)).toBeTruthy();
   });
 
-  it('без цены пишет «Цена не указана»', () => {
-    render(<TripCard trip={trip({ priceRub: null })} onClick={() => undefined} />);
-    expect(screen.getByText('Цена не указана')).toBeTruthy();
+  it('цена показана всегда — поле обязательное', () => {
+    render(<TripCard trip={trip({ priceRub: 850 })} onClick={() => undefined} />);
+    expect(screen.getByText('850 ₽')).toBeTruthy();
   });
 
   it('при нуле мест пишет «Мест нет»', () => {
@@ -60,7 +60,7 @@ describe('карточка поездки', () => {
     const onClick = vi.fn();
     render(<TripCard trip={trip()} onClick={onClick} />);
 
-    fireEvent.click(screen.getByText(/Москва → Тула/));
+    fireEvent.click(screen.getByText(/Оренбург → Соль-Илецк/));
 
     expect(onClick).toHaveBeenCalledTimes(1);
   });

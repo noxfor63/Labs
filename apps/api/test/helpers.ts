@@ -1,7 +1,15 @@
 import type { PrismaClient } from '@prisma/client';
 import type { FastifyInstance } from 'fastify';
 
-import { TRIP_ROLE, TRIP_STATUS, type TripRole, type TripStatus } from '@vk-rideshare/shared';
+import {
+  ORENBURG,
+  SOL_ILETSK,
+  TRIP_ROLE,
+  TRIP_STATUS,
+  nextDepartSlot,
+  type TripRole,
+  type TripStatus,
+} from '@vk-rideshare/shared';
 
 import { buildApp } from '../src/app.js';
 import { createPrismaClient } from '../src/db.js';
@@ -131,7 +139,7 @@ export type TripFixture = {
   fromCity?: string;
   toCity?: string;
   departAt?: Date;
-  priceRub?: number | null;
+  priceRub?: number;
 };
 
 export async function createTrip(
@@ -143,12 +151,13 @@ export async function createTrip(
     data: {
       authorVkId: fixture.authorVkId,
       role: fixture.role ?? TRIP_ROLE.DRIVER,
-      fromCity: fixture.fromCity ?? 'Москва',
-      toCity: fixture.toCity ?? 'Тула',
-      departAt: fixture.departAt ?? new Date(Date.now() + 3 * DAY),
+      fromCity: fixture.fromCity ?? ORENBURG,
+      toCity: fixture.toCity ?? SOL_ILETSK,
+      // Время всегда по сетке получасов — как того требует контракт.
+      departAt: fixture.departAt ?? nextDepartSlot(new Date(Date.now() + 3 * DAY)),
       seatsTotal,
       seatsLeft: fixture.seatsLeft ?? seatsTotal,
-      priceRub: fixture.priceRub === undefined ? 1000 : fixture.priceRub,
+      priceRub: fixture.priceRub ?? 600,
       status: fixture.status ?? TRIP_STATUS.ACTIVE,
     },
   });

@@ -1,6 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
+  AKBULAK,
+  ORENBURG,
+  ROUTES,
+  SOL_ILETSK,
+  nextDepartSlot,
+} from '@vk-rideshare/shared';
+
+import {
   DAY,
   authHeaders,
   createTestApp,
@@ -13,7 +21,9 @@ const AUTHOR = 5_400_001n;
 const RIDER = 5_400_002n;
 const OUTSIDER = 5_400_003n;
 
-const futureIso = (days: number): string => new Date(Date.now() + days * DAY).toISOString();
+/** Будущий момент, выровненный по сетке получасов. */
+const futureIso = (days: number): string =>
+  nextDepartSlot(new Date(Date.now() + days * DAY)).toISOString();
 
 describe('POST /api/trips — создание и валидация', () => {
   let ctx: TestContext;
@@ -43,12 +53,12 @@ describe('POST /api/trips — создание и валидация', () => {
 
   const validPayload = (): Record<string, unknown> => ({
     role: 'DRIVER',
-    fromCity: 'Москва',
-    fromPoint: 'метро Тёплый Стан',
-    toCity: 'Тула',
+    fromCity: ORENBURG,
+    fromPoint: 'автовокзал',
+    toCity: SOL_ILETSK,
     departAt: futureIso(2),
     seatsTotal: 3,
-    priceRub: 900,
+    priceRub: 600,
     carModel: 'Lada Vesta',
     comment: 'Еду спокойно.',
   });
@@ -59,8 +69,8 @@ describe('POST /api/trips — создание и валидация', () => {
     expect(response.statusCode).toBe(201);
     expect(response.json()).toMatchObject({
       role: 'DRIVER',
-      fromCity: 'Москва',
-      toCity: 'Тула',
+      fromCity: ORENBURG,
+      toCity: SOL_ILETSK,
       seatsTotal: 3,
       seatsLeft: 3,
       status: 'ACTIVE',
@@ -82,36 +92,93 @@ describe('POST /api/trips — создание и валидация', () => {
     }
   });
 
-  it('совпадающие «откуда» и «куда» — 400', async () => {
+  it('совпадающие «откуда» и «куда» — 400: такого направления нет', async () => {
     const response = await create({
       ...validPayload(),
-      fromCity: 'Казань',
-      fromPoint: null,
-      toCity: 'Казань',
-      toPoint: null,
-    });
-
-    expect(response.statusCode).toBe(400);
-    expect(response.json().error.message).toMatch(/различаться/i);
-  });
-
-  it('один и тот же город с разными точками — разрешено', async () => {
-    const response = await create({
-      ...validPayload(),
-      fromCity: 'Казань',
-      fromPoint: 'аэропорт',
-      toCity: 'Казань',
+      fromCity: ORENBURG,
+      fromPoint: 'автовокзал',
+      toCity: ORENBURG,
       toPoint: 'ж/д вокзал',
     });
 
-    expect(response.statusCode).toBe(201);
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.message).toMatch(/направлени/i);
   });
 
-  it('город вне справочника — 400', async () => {
+  it('принимаются все шесть направлений справочника и никакие другие', async () => {
+    for (const route of ROUTES) {
+      const response = await create({
+        ...validPayload(),
+        fromCity: route.from,
+        toCity: route.to,
+      });
+      expect([route.from, route.to, response.statusCode]).toEqual([
+        route.from,
+        route.to,
+        201,
+      ]);
+    }
+  });
+
+  it('город вне списка направлений — 400', async () => {
     const response = await create({ ...validPayload(), toCity: 'Хогсмид' });
 
     expect(response.statusCode).toBe(400);
-    expect(response.json().error.message).toMatch(/справочник/i);
+    expect(response.json().error.message).toMatch(/списке направлений/i);
+  });
+
+  it('цена вне коридора 500–850 ₽ — 400', async () => {
+    for (const priceRub of [0, 499, 851, 5000]) {
+      const response = await create({ ...validPayload(), priceRub });
+      expect([priceRub, response.statusCode]).toEqual([priceRub, 400]);
+    }
+  });
+
+  it('цена обязательна', async () => {
+    const payload = validPayload();
+    delete payload['priceRub'];
+
+    const response = await create(payload);
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.message).toMatch(/priceRub/i);
+  });
+
+  it('границы коридора цен принимаются', async () => {
+    for (const priceRub of [500, 850]) {
+      const response = await create({ ...validPayload(), priceRub });
+      expect([priceRub, response.statusCode]).toEqual([priceRub, 201]);
+    }
+  });
+
+  it('время выезда не по сетке получасов — 400', async () => {
+    const base = nextDepartSlot(new Date(Date.now() + 2 * DAY));
+
+    for (const offsetMinutes of [1, 7, 15, 29]) {
+      const departAt = new Date(base.getTime() + offsetMinutes * 60 * 1000).toISOString();
+      const response = await create({ ...validPayload(), departAt });
+      expect([offsetMinutes, response.statusCode]).toEqual([offsetMinutes, 400]);
+      expect(response.json().error.message).toMatch(/шагом 30 минут/i);
+    }
+  });
+
+  it('секунды и миллисекунды во времени выезда не допускаются', async () => {
+    const base = nextDepartSlot(new Date(Date.now() + 2 * DAY));
+    const withSeconds = new Date(base.getTime() + 30 * 1000).toISOString();
+
+    const response = await create({ ...validPayload(), departAt: withSeconds });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('ровно :00 и :30 принимаются', async () => {
+    const base = nextDepartSlot(new Date(Date.now() + 2 * DAY));
+
+    for (const offsetMinutes of [0, 30, 60, 90]) {
+      const departAt = new Date(base.getTime() + offsetMinutes * 60 * 1000).toISOString();
+      const response = await create({ ...validPayload(), departAt });
+      expect([offsetMinutes, response.statusCode]).toEqual([offsetMinutes, 201]);
+    }
   });
 
   it('поездка приписывается автору из подписи, а не из тела запроса', async () => {
@@ -285,24 +352,24 @@ describe('PATCH /api/trips/:id и мои разделы', () => {
       method: 'POST',
       url: '/api/session',
       headers: authHeaders(newcomer),
-      payload: { firstName: 'Пётр', lastName: 'Петров', city: 'Казань' },
+      payload: { firstName: 'Пётр', lastName: 'Петров', city: AKBULAK },
     });
 
     expect(first.statusCode).toBe(200);
     expect(first.json().user).toMatchObject({
       vkUserId: newcomer.toString(),
       firstName: 'Пётр',
-      city: 'Казань',
+      city: AKBULAK,
     });
 
     const second = await ctx.app.inject({
       method: 'POST',
       url: '/api/session',
       headers: authHeaders(newcomer),
-      payload: { firstName: 'Пётр', lastName: 'Сидоров', city: 'Уфа' },
+      payload: { firstName: 'Пётр', lastName: 'Сидоров', city: SOL_ILETSK },
     });
 
-    expect(second.json().user).toMatchObject({ lastName: 'Сидоров', city: 'Уфа' });
+    expect(second.json().user).toMatchObject({ lastName: 'Сидоров', city: SOL_ILETSK });
     expect(await ctx.prisma.user.count({ where: { vkUserId: newcomer } })).toBe(1);
 
     await ctx.prisma.user.delete({ where: { vkUserId: newcomer } });

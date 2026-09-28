@@ -51,8 +51,9 @@ export const LAUNCH_PARAMS_MAX_AGE_SECONDS = 24 * 60 * 60;
 export const LIMITS = {
   SEATS_MIN: 1,
   SEATS_MAX: 8,
-  PRICE_MIN: 0,
-  PRICE_MAX: 100_000,
+  /** Цена за место на этих маршрутах: коридор задан продуктом, а не рынком. */
+  PRICE_MIN: 500,
+  PRICE_MAX: 850,
   RATING_MIN: 1,
   RATING_MAX: 5,
   POINT_MAX: 120,

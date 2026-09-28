@@ -7,7 +7,15 @@
  */
 import { type Prisma, type PrismaClient } from '@prisma/client';
 
-import { CITIES } from '@vk-rideshare/shared';
+import {
+  AKBULAK,
+  CITIES,
+  LIMITS,
+  ORENBURG,
+  ROUTES,
+  SOL_ILETSK,
+  isAllowedDepartTime,
+} from '@vk-rideshare/shared';
 
 import { createPrismaClient } from '../src/db.js';
 
@@ -40,48 +48,48 @@ const DAY = 24 * HOUR;
 /* ─────────────────── исходные данные ─────────────────── */
 
 const PEOPLE = [
-  { vkUserId: 1_000_001n, firstName: 'Анна', lastName: 'Ковалёва', city: 'Москва' },
-  { vkUserId: 1_000_002n, firstName: 'Дмитрий', lastName: 'Соколов', city: 'Санкт-Петербург' },
-  { vkUserId: 1_000_003n, firstName: 'Мария', lastName: 'Егорова', city: 'Казань' },
-  { vkUserId: 1_000_004n, firstName: 'Игорь', lastName: 'Верещагин', city: 'Нижний Новгород' },
-  { vkUserId: 1_000_005n, firstName: 'Ольга', lastName: 'Панкратова', city: 'Екатеринбург' },
-  { vkUserId: 1_000_006n, firstName: 'Тимур', lastName: 'Гаязов', city: 'Уфа' },
-  { vkUserId: 1_000_007n, firstName: 'Светлана', lastName: 'Юрченко', city: 'Краснодар' },
-  { vkUserId: 1_000_008n, firstName: 'Никита', lastName: 'Бортников', city: 'Новосибирск' },
-  { vkUserId: 1_000_009n, firstName: 'Алина', lastName: 'Мещерякова', city: 'Воронеж' },
-  { vkUserId: 1_000_010n, firstName: 'Павел', lastName: 'Стрельцов', city: 'Самара' },
+  { vkUserId: 1_000_001n, firstName: 'Анна', lastName: 'Ковалёва', city: ORENBURG },
+  { vkUserId: 1_000_002n, firstName: 'Дмитрий', lastName: 'Соколов', city: SOL_ILETSK },
+  { vkUserId: 1_000_003n, firstName: 'Мария', lastName: 'Егорова', city: AKBULAK },
+  { vkUserId: 1_000_004n, firstName: 'Игорь', lastName: 'Верещагин', city: ORENBURG },
+  { vkUserId: 1_000_005n, firstName: 'Ольга', lastName: 'Панкратова', city: SOL_ILETSK },
+  { vkUserId: 1_000_006n, firstName: 'Тимур', lastName: 'Гаязов', city: AKBULAK },
+  { vkUserId: 1_000_007n, firstName: 'Светлана', lastName: 'Юрченко', city: ORENBURG },
+  { vkUserId: 1_000_008n, firstName: 'Никита', lastName: 'Бортников', city: SOL_ILETSK },
+  { vkUserId: 1_000_009n, firstName: 'Алина', lastName: 'Мещерякова', city: AKBULAK },
+  { vkUserId: 1_000_010n, firstName: 'Павел', lastName: 'Стрельцов', city: ORENBURG },
 ] as const;
 
-/** Правдоподобные междугородние направления из справочника городов. */
-const ROUTES: ReadonlyArray<readonly [string, string]> = [
-  ['Москва', 'Санкт-Петербург'],
-  ['Санкт-Петербург', 'Москва'],
-  ['Москва', 'Нижний Новгород'],
-  ['Москва', 'Воронеж'],
-  ['Москва', 'Тула'],
-  ['Москва', 'Ярославль'],
-  ['Казань', 'Набережные Челны'],
-  ['Казань', 'Самара'],
-  ['Екатеринбург', 'Челябинск'],
-  ['Екатеринбург', 'Пермь'],
-  ['Новосибирск', 'Томск'],
-  ['Новосибирск', 'Барнаул'],
-  ['Краснодар', 'Сочи'],
-  ['Краснодар', 'Ростов-на-Дону'],
-  ['Уфа', 'Челябинск'],
-  ['Самара', 'Тольятти'],
-  ['Воронеж', 'Липецк'],
-  ['Ростов-на-Дону', 'Таганрог'],
-  ['Пермь', 'Ижевск'],
-  ['Саратов', 'Волгоград'],
+/**
+ * Цена зависит от направления: Оренбург — Соль-Илецк около 70 км,
+ * Акбулак — Соль-Илецк около 90, Оренбург — Акбулак около 130.
+ * Коридор целиком укладывается в LIMITS.PRICE_MIN..PRICE_MAX.
+ */
+const PRICE_BY_ROUTE: ReadonlyArray<{ cities: readonly [string, string]; min: number; max: number }> = [
+  { cities: [ORENBURG, SOL_ILETSK], min: 500, max: 600 },
+  { cities: [AKBULAK, SOL_ILETSK], min: 550, max: 700 },
+  { cities: [ORENBURG, AKBULAK], min: 700, max: 850 },
 ];
 
+/** Цена кратна 50 рублям — так её и называют в объявлениях. */
+function priceFor(from: string, to: string): number {
+  const band = PRICE_BY_ROUTE.find(
+    ({ cities }) =>
+      (cities[0] === from && cities[1] === to) || (cities[0] === to && cities[1] === from),
+  );
+  if (band === undefined) {
+    throw new Error(`Нет коридора цен для ${from} → ${to}`);
+  }
+  const steps = (band.max - band.min) / 50;
+  return band.min + int(0, steps) * 50;
+}
+
 const PICKUP_POINTS = [
-  'метро, у первого вагона',
   'автовокзал',
   'ж/д вокзал',
-  'заправка на выезде',
-  'ТЦ у кольца',
+  'у центрального рынка',
+  'заправка на выезде из города',
+  'остановка у школы',
   'площадь Победы',
 ];
 
@@ -101,6 +109,7 @@ const DRIVER_COMMENTS = [
   'Выезд строго по времени, опоздавших ждать не смогу.',
   'Можно с небольшим питомцем в переноске.',
   'Кондиционер работает, музыка по вкусу пассажиров.',
+  'Довезу до любой точки в городе, по пути высажу.',
 ];
 
 const PASSENGER_COMMENTS = [
@@ -131,9 +140,9 @@ const KNOWN_CITY_NAMES = new Set(CITIES.map((city) => city.name));
 /* ─────────────────── наполнение ─────────────────── */
 
 async function main(prisma: PrismaClient): Promise<void> {
-  for (const [from, to] of ROUTES) {
-    if (!KNOWN_CITY_NAMES.has(from) || !KNOWN_CITY_NAMES.has(to)) {
-      throw new Error(`Маршрут ${from} → ${to} ссылается на город вне справочника`);
+  for (const route of ROUTES) {
+    if (!KNOWN_CITY_NAMES.has(route.from) || !KNOWN_CITY_NAMES.has(route.to)) {
+      throw new Error(`Маршрут ${route.from} → ${route.to} ссылается на город вне справочника`);
     }
   }
 
@@ -158,25 +167,45 @@ async function main(prisma: PrismaClient): Promise<void> {
   const now = Date.now();
   const tripRows: Prisma.TripCreateManyInput[] = [];
 
+  /**
+   * Время выезда — строго по сетке получасов, как требует контракт.
+   * Считаем от полуночи UTC, чтобы сид не зависел от часового пояса машины.
+   */
+  const midnightUtc = Date.UTC(
+    new Date(now).getUTCFullYear(),
+    new Date(now).getUTCMonth(),
+    new Date(now).getUTCDate(),
+  );
+  const slot = (dayOffset: number, slotIndex: number): Date =>
+    new Date(midnightUtc + dayOffset * DAY + slotIndex * 30 * 60 * 1000);
+
   // 26 активных будущих поездок + 8 завершённых + 2 отменённые = 36.
-  for (let index = 0; index < 26; index += 1) {
+  let activeCount = 0;
+  for (let index = 0; activeCount < 26; index += 1) {
     const route = ROUTES[index % ROUTES.length]!;
     const author = PEOPLE[index % PEOPLE.length]!;
     const isDriver = chance(0.7);
     const seatsTotal = isDriver ? int(1, 4) : int(1, 2);
+
+    // День от завтра до +20, слот — от 05:00 до 21:30 по UTC.
+    const departAt = slot(1 + (index % 20), int(10, 43));
+    if (departAt.getTime() <= now) {
+      continue;
+    }
+
+    activeCount += 1;
     tripRows.push({
-      id: `seed-active-${index + 1}`,
+      id: `seed-active-${activeCount}`,
       authorVkId: author.vkUserId,
       role: isDriver ? 'DRIVER' : 'PASSENGER',
-      fromCity: route[0],
-      toCity: route[1],
+      fromCity: route.from,
+      toCity: route.to,
       fromPoint: chance(0.7) ? pick(PICKUP_POINTS) : null,
       toPoint: chance(0.5) ? pick(PICKUP_POINTS) : null,
-      // Разброс: от +6 часов до +20 суток, разное время суток.
-      departAt: new Date(now + 6 * HOUR + index * 17 * HOUR + int(0, 6) * HOUR),
+      departAt,
       seatsTotal,
       seatsLeft: seatsTotal,
-      priceRub: chance(0.85) ? int(3, 26) * 100 : null,
+      priceRub: priceFor(route.from, route.to),
       carModel: isDriver ? pick(CARS) : null,
       comment: chance(0.8) ? pick(isDriver ? DRIVER_COMMENTS : PASSENGER_COMMENTS) : null,
       status: 'ACTIVE',
@@ -191,14 +220,14 @@ async function main(prisma: PrismaClient): Promise<void> {
       id: `seed-completed-${index + 1}`,
       authorVkId: author.vkUserId,
       role: 'DRIVER',
-      fromCity: route[0],
-      toCity: route[1],
+      fromCity: route.from,
+      toCity: route.to,
       fromPoint: pick(PICKUP_POINTS),
       toPoint: null,
-      departAt: new Date(now - (index + 2) * 3 * DAY),
+      departAt: slot(-(index + 2) * 3, int(12, 40)),
       seatsTotal,
       seatsLeft: seatsTotal,
-      priceRub: int(4, 20) * 100,
+      priceRub: priceFor(route.from, route.to),
       carModel: pick(CARS),
       comment: pick(DRIVER_COMMENTS),
       status: 'COMPLETED',
@@ -213,18 +242,29 @@ async function main(prisma: PrismaClient): Promise<void> {
       id: `seed-cancelled-${index + 1}`,
       authorVkId: author.vkUserId,
       role: 'DRIVER',
-      fromCity: route[0],
-      toCity: route[1],
+      fromCity: route.from,
+      toCity: route.to,
       fromPoint: null,
       toPoint: null,
-      departAt: new Date(now + (index + 3) * DAY),
+      departAt: slot(index + 3, int(14, 38)),
       seatsTotal,
       seatsLeft: seatsTotal,
-      priceRub: int(5, 15) * 100,
+      priceRub: priceFor(route.from, route.to),
       carModel: pick(CARS),
       comment: null,
       status: 'CANCELLED',
     });
+  }
+
+  // Сид не имеет права породить данные, которые не прошли бы валидацию API.
+  for (const trip of tripRows) {
+    if (!isAllowedDepartTime(trip.departAt as Date)) {
+      throw new Error(`Поездка ${trip.id} выезжает вне сетки получасов: ${String(trip.departAt)}`);
+    }
+    const price = trip.priceRub as number;
+    if (price < LIMITS.PRICE_MIN || price > LIMITS.PRICE_MAX) {
+      throw new Error(`Поездка ${trip.id} с ценой ${price} ₽ вне коридора`);
+    }
   }
 
   await prisma.trip.createMany({ data: tripRows });
@@ -354,6 +394,10 @@ async function main(prisma: PrismaClient): Promise<void> {
     distinct: ['fromCity', 'toCity'],
     select: { fromCity: true, toCity: true },
   });
+  const priceRange = await prisma.trip.aggregate({
+    _min: { priceRub: true },
+    _max: { priceRub: true },
+  });
 
   console.log('');
   console.log('  Сид выполнен');
@@ -361,6 +405,9 @@ async function main(prisma: PrismaClient): Promise<void> {
   console.log(`  Пользователей:        ${users}`);
   console.log(`  Поездок:              ${trips}  (ACTIVE ${active} / COMPLETED ${completed} / CANCELLED ${cancelled})`);
   console.log(`  Уникальных маршрутов: ${routes.length}`);
+  console.log(
+    `  Цены:                 ${priceRange._min.priceRub} – ${priceRange._max.priceRub} ₽`,
+  );
   console.log(`  Откликов:             ${requests}  (PENDING ${pending} / ACCEPTED ${acceptedCount})`);
   console.log(`  Отзывов:              ${reviews}`);
   console.log('');
@@ -373,11 +420,10 @@ async function main(prisma: PrismaClient): Promise<void> {
   });
   console.log('  Ближайшие активные поездки:');
   for (const trip of sample) {
-    const price = trip.priceRub === null ? 'цена не указана' : `${trip.priceRub} ₽`;
     console.log(
       `   • ${trip.fromCity} → ${trip.toCity}, ${trip.departAt.toISOString()}, ` +
         `${trip.role === 'DRIVER' ? 'водитель' : 'пассажир'} ${trip.author.firstName} ${trip.author.lastName}, ` +
-        `мест ${trip.seatsLeft}/${trip.seatsTotal}, ${price}`,
+        `мест ${trip.seatsLeft}/${trip.seatsTotal}, ${trip.priceRub} ₽`,
     );
   }
   console.log('');

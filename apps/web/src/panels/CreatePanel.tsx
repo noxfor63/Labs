@@ -1,6 +1,10 @@
 import {
-  CITIES_ALPHABETICAL,
+  CITIES,
+  DEPART_TIME_SLOTS,
   LIMITS,
+  destinationsFrom,
+  isAllowedDepartTime,
+  isKnownRoute,
   type CreateTripInput,
   type TripRole,
 } from '@vk-rideshare/shared';
@@ -25,7 +29,13 @@ import { ApiRequestError, api } from '../api/client.js';
 import { toDateInputValue } from '../lib/format.js';
 import { useSnackbar } from '../lib/SnackbarContext.js';
 
-const cityOptions = CITIES_ALPHABETICAL.map((city) => ({ value: city.name, label: city.name }));
+const toOptions = (cities: readonly { name: string }[]) =>
+  cities.map((city) => ({ value: city.name, label: city.name }));
+
+const allCityOptions = toOptions(CITIES);
+
+/** 48 получасовых слотов суток — время выезда выбирается только из них. */
+const timeOptions = DEPART_TIME_SLOTS.map((slot) => ({ value: slot, label: slot }));
 
 type FieldErrors = Partial<Record<string, string>>;
 
@@ -52,7 +62,7 @@ const emptyForm = (): FormState => ({
   date: toDateInputValue(new Date(Date.now() + 24 * 60 * 60 * 1000)),
   time: '09:00',
   seatsTotal: '3',
-  priceRub: '',
+  priceRub: '600',
   carModel: '',
   comment: '',
 });
@@ -67,24 +77,25 @@ function validate(form: FormState): { errors: FieldErrors; departAt: Date | null
   if (form.toCity === '') {
     errors['toCity'] = 'Выберите город назначения';
   }
-  if (
-    form.fromCity !== '' &&
-    form.fromCity === form.toCity &&
-    form.fromPoint.trim() === form.toPoint.trim()
-  ) {
-    errors['toCity'] = 'Пункты отправления и назначения должны различаться';
+  if (form.fromCity !== '' && form.toCity !== '' && !isKnownRoute(form.fromCity, form.toCity)) {
+    errors['toCity'] = 'Такого направления нет';
   }
 
   let departAt: Date | null = null;
   if (form.date === '' || form.time === '') {
     errors['date'] = 'Укажите дату и время';
   } else {
+    // Время местное: пользователь выбирает слот в своём часовом поясе.
     departAt = new Date(`${form.date}T${form.time}`);
     if (Number.isNaN(departAt.getTime())) {
       errors['date'] = 'Некорректная дата';
       departAt = null;
     } else if (departAt.getTime() <= Date.now()) {
       errors['date'] = 'Дата отправления должна быть в будущем';
+    } else if (!isAllowedDepartTime(departAt)) {
+      // Пояса России смещены на целое число часов, так что сюда можно
+      // попасть только из экзотического пояса со смещением в 45 минут.
+      errors['time'] = 'Выберите время из списка получасовых слотов';
     }
   }
 
@@ -97,11 +108,15 @@ function validate(form: FormState): { errors: FieldErrors; departAt: Date | null
     errors['seatsTotal'] = `От ${LIMITS.SEATS_MIN} до ${LIMITS.SEATS_MAX}`;
   }
 
-  if (form.priceRub !== '') {
-    const price = Number(form.priceRub);
-    if (!Number.isInteger(price) || price < 0 || price > LIMITS.PRICE_MAX) {
-      errors['priceRub'] = `От 0 до ${LIMITS.PRICE_MAX}`;
-    }
+  const price = Number(form.priceRub);
+  if (form.priceRub === '') {
+    errors['priceRub'] = 'Укажите цену';
+  } else if (
+    !Number.isInteger(price) ||
+    price < LIMITS.PRICE_MIN ||
+    price > LIMITS.PRICE_MAX
+  ) {
+    errors['priceRub'] = `От ${LIMITS.PRICE_MIN} до ${LIMITS.PRICE_MAX} ₽`;
   }
 
   return { errors, departAt };
@@ -142,7 +157,7 @@ export function CreatePanel({ id }: { id: string }): ReactNode {
       toPoint: form.toPoint.trim() === '' ? null : form.toPoint.trim(),
       departAt: departAt.toISOString(),
       seatsTotal: Number(form.seatsTotal),
-      priceRub: form.priceRub === '' ? null : Number(form.priceRub),
+      priceRub: Number(form.priceRub),
       carModel: form.carModel.trim() === '' ? null : form.carModel.trim(),
       comment: form.comment.trim() === '' ? null : form.comment.trim(),
     };
@@ -163,6 +178,18 @@ export function CreatePanel({ id }: { id: string }): ReactNode {
   };
 
   const isDriver = form.role === 'DRIVER';
+
+  // Направления закрытые: показываем только достижимые города,
+  // чтобы невозможный маршрут нельзя было и собрать.
+  const toCityOptions =
+    form.fromCity === '' ? allCityOptions : toOptions(destinationsFrom(form.fromCity));
+
+  const pickFromCity = (value: string): void => {
+    update('fromCity', value);
+    if (value !== '' && form.toCity !== '' && !isKnownRoute(value, form.toCity)) {
+      update('toCity', '');
+    }
+  };
 
   return (
     <Panel id={id}>
@@ -191,11 +218,10 @@ export function CreatePanel({ id }: { id: string }): ReactNode {
         >
           <CustomSelect
             placeholder="Выберите город"
-            searchable
-            options={cityOptions}
+            options={allCityOptions}
             value={form.fromCity === '' ? null : form.fromCity}
             onChange={(_, value) => {
-              update('fromCity', value === null ? '' : String(value));
+              pickFromCity(value === null ? '' : String(value));
             }}
           />
         </FormItem>
@@ -217,8 +243,7 @@ export function CreatePanel({ id }: { id: string }): ReactNode {
         >
           <CustomSelect
             placeholder="Выберите город"
-            searchable
-            options={cityOptions}
+            options={toCityOptions}
             value={form.toCity === '' ? null : form.toCity}
             onChange={(_, value) => {
               update('toCity', value === null ? '' : String(value));
@@ -252,12 +277,16 @@ export function CreatePanel({ id }: { id: string }): ReactNode {
               }}
             />
           </FormItem>
-          <FormItem top="Время">
-            <Input
-              type="time"
+          <FormItem
+            top="Время выезда"
+            status={errors['time'] === undefined ? 'default' : 'error'}
+            bottom={errors['time']}
+          >
+            <CustomSelect
+              options={timeOptions}
               value={form.time}
-              onChange={(event) => {
-                update('time', event.target.value);
+              onChange={(_, value) => {
+                update('time', value === null ? '' : String(value));
               }}
             />
           </FormItem>
@@ -283,14 +312,15 @@ export function CreatePanel({ id }: { id: string }): ReactNode {
           <FormItem
             top="Цена с человека, ₽"
             status={errors['priceRub'] === undefined ? 'default' : 'error'}
-            bottom={errors['priceRub'] ?? 'Можно не указывать'}
+            bottom={errors['priceRub'] ?? `От ${LIMITS.PRICE_MIN} до ${LIMITS.PRICE_MAX}`}
           >
             <Input
               type="number"
               inputMode="numeric"
-              min={0}
+              min={LIMITS.PRICE_MIN}
               max={LIMITS.PRICE_MAX}
-              placeholder="Договоримся"
+              step={50}
+              required
               value={form.priceRub}
               onChange={(event) => {
                 update('priceRub', event.target.value);

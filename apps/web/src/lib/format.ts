@@ -19,8 +19,8 @@ export const formatDate = (iso: string): string => DATE_FORMAT.format(new Date(i
 export const formatDateTime = (iso: string): string => DATE_TIME_FORMAT.format(new Date(iso));
 export const formatTime = (iso: string): string => TIME_FORMAT.format(new Date(iso));
 
-export function formatPrice(priceRub: number | null): string {
-  return priceRub === null ? 'Цена не указана' : `${priceRub.toLocaleString('ru-RU')} ₽`;
+export function formatPrice(priceRub: number): string {
+  return `${priceRub.toLocaleString('ru-RU')} ₽`;
 }
 
 /** «3 места», «1 место», «5 мест» — без библиотек склонения. */

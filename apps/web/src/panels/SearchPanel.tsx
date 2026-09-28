@@ -1,6 +1,8 @@
 import {
-  CITIES_ALPHABETICAL,
+  CITIES,
   LIMITS,
+  destinationsFrom,
+  isKnownRoute,
   type TripListQuery,
   type TripRole,
 } from '@vk-rideshare/shared';
@@ -28,7 +30,10 @@ import { TripCard } from '../components/TripCard.js';
 import { TripCardSkeleton } from '../components/TripCardSkeleton.js';
 import { useTripFeed } from '../lib/useTripFeed.js';
 
-const cityOptions = CITIES_ALPHABETICAL.map((city) => ({ value: city.name, label: city.name }));
+const toOptions = (cities: readonly { name: string }[]) =>
+  cities.map((city) => ({ value: city.name, label: city.name }));
+
+const allCityOptions = toOptions(CITIES);
 
 type RoleFilter = TripRole | 'ANY';
 
@@ -63,7 +68,12 @@ export function SearchPanel({ id }: { id: string }): ReactNode {
       next.role = role;
     }
     const price = Number(priceMax);
-    if (priceMax !== '' && Number.isFinite(price) && price >= 0) {
+    if (
+      priceMax !== '' &&
+      Number.isFinite(price) &&
+      price >= LIMITS.PRICE_MIN &&
+      price <= LIMITS.PRICE_MAX
+    ) {
       next.priceMax = price;
     }
     const seats = Number(seatsMin);
@@ -74,6 +84,19 @@ export function SearchPanel({ id }: { id: string }): ReactNode {
   }, [from, to, date, role, priceMax, seatsMin]);
 
   const hasFilters = Object.keys(applied).length > 0;
+
+  // Список направлений закрытый, поэтому «куда» показываем только то,
+  // куда из выбранного города действительно ездят.
+  const toOptionsForFrom =
+    from === '' ? allCityOptions : toOptions(destinationsFrom(from));
+
+  const pickFrom = (value: string): void => {
+    setFrom(value);
+    // Прошлое «куда» могло стать недостижимым — тогда сбрасываем его.
+    if (value !== '' && to !== '' && !isKnownRoute(value, to)) {
+      setTo('');
+    }
+  };
 
   // Подгрузка по скроллу: наблюдаем за пустым блоком в конце списка.
   const [sentinel, setSentinel] = useState<HTMLDivElement | null>(null);
@@ -106,21 +129,19 @@ export function SearchPanel({ id }: { id: string }): ReactNode {
           <FormItem top="Откуда">
             <CustomSelect
               placeholder="Любой город"
-              searchable
               allowClearButton
-              options={cityOptions}
+              options={allCityOptions}
               value={from === '' ? null : from}
               onChange={(_, value) => {
-                setFrom(value === null ? '' : String(value));
+                pickFrom(value === null ? '' : String(value));
               }}
             />
           </FormItem>
           <FormItem top="Куда">
             <CustomSelect
               placeholder="Любой город"
-              searchable
               allowClearButton
-              options={cityOptions}
+              options={toOptionsForFrom}
               value={to === '' ? null : to}
               onChange={(_, value) => {
                 setTo(value === null ? '' : String(value));
@@ -158,9 +179,10 @@ export function SearchPanel({ id }: { id: string }): ReactNode {
             <Input
               type="number"
               inputMode="numeric"
-              min={0}
+              min={LIMITS.PRICE_MIN}
               max={LIMITS.PRICE_MAX}
-              placeholder="Любая"
+              step={50}
+              placeholder={`До ${LIMITS.PRICE_MAX}`}
               value={priceMax}
               onChange={(event) => {
                 setPriceMax(event.target.value);

@@ -10,7 +10,7 @@
  */
 import { z } from 'zod';
 
-import { isKnownCity } from './cities.js';
+import { isKnownCity, isKnownRoute } from './cities.js';
 import {
   ERROR_CODE,
   LIMITS,
@@ -18,6 +18,7 @@ import {
   TRIP_ROLES,
   TRIP_STATUSES,
 } from './domain.js';
+import { DEPART_STEP_MINUTES, isAllowedDepartTime } from './schedule.js';
 
 /* ──────────────────────────── примитивы ──────────────────────────── */
 
@@ -29,7 +30,7 @@ export const cityNameSchema = z
   .string()
   .trim()
   .min(1)
-  .refine(isKnownCity, { message: 'Город не найден в справочнике' });
+  .refine(isKnownCity, { message: 'Такого города нет в списке направлений' });
 
 const optionalText = (max: number) =>
   z
@@ -84,7 +85,7 @@ export const tripSummarySchema = z.object({
   departAt: z.string(),
   seatsTotal: z.number().int(),
   seatsLeft: z.number().int(),
-  priceRub: z.number().int().nullable(),
+  priceRub: z.number().int(),
   carModel: z.string().nullable(),
   comment: z.string().nullable(),
   status: tripStatusSchema,
@@ -165,10 +166,8 @@ export const createTripSchema = z
     priceRub: z.coerce
       .number()
       .int()
-      .min(LIMITS.PRICE_MIN)
-      .max(LIMITS.PRICE_MAX)
-      .nullish()
-      .transform((value) => value ?? null),
+      .min(LIMITS.PRICE_MIN, `Цена не может быть меньше ${LIMITS.PRICE_MIN} ₽`)
+      .max(LIMITS.PRICE_MAX, `Цена не может быть больше ${LIMITS.PRICE_MAX} ₽`),
     carModel: optionalText(LIMITS.CAR_MODEL_MAX),
     comment: optionalText(LIMITS.COMMENT_MAX),
   })
@@ -176,15 +175,14 @@ export const createTripSchema = z
     message: 'Дата отправления должна быть в будущем',
     path: ['departAt'],
   })
-  .refine(
-    (value) =>
-      value.fromCity !== value.toCity ||
-      (value.fromPoint ?? '') !== (value.toPoint ?? ''),
-    {
-      message: 'Пункты отправления и назначения должны различаться',
-      path: ['toCity'],
-    },
-  );
+  .refine((value) => isAllowedDepartTime(new Date(value.departAt)), {
+    message: `Время выезда задаётся с шагом ${DEPART_STEP_MINUTES} минут: 08:00, 08:30 и так далее`,
+    path: ['departAt'],
+  })
+  .refine((value) => isKnownRoute(value.fromCity, value.toCity), {
+    message: 'Такого направления нет. Доступны Оренбург, Соль-Илецк и Акбулак между собой',
+    path: ['toCity'],
+  });
 export type CreateTripInput = z.input<typeof createTripSchema>;
 
 export const patchTripSchema = z.object({

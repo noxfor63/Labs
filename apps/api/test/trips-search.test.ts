@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { AKBULAK, ORENBURG, SOL_ILETSK } from '@vk-rideshare/shared';
+
 import { authHeaders, createTestApp, type TestContext } from './helpers.js';
 
 const VIEWER = 1_000_001;
@@ -10,7 +12,7 @@ type TripItem = {
   toCity: string;
   role: string;
   departAt: string;
-  priceRub: number | null;
+  priceRub: number;
   seatsLeft: number;
   status: string;
 };
@@ -62,26 +64,79 @@ describe('GET /api/trips — фильтры на сид-данных', () => {
 
   it('фильтр «откуда» сужает выдачу и не пропускает чужие города', async () => {
     const all = await fetchTrips('?limit=50');
-    const filtered = await fetchTrips(`?limit=50&from=${encodeURIComponent('Москва')}`);
+    const filtered = await fetchTrips(`?limit=50&from=${encodeURIComponent(ORENBURG)}`);
 
     expect(filtered.items.length).toBeGreaterThan(0);
     expect(filtered.items.length).toBeLessThan(all.items.length);
-    expect(filtered.items.every((trip) => trip.fromCity === 'Москва')).toBe(true);
+    expect(filtered.items.every((trip) => trip.fromCity === ORENBURG)).toBe(true);
   });
 
   it('фильтр «откуда + куда» сужает сильнее, чем один «откуда»', async () => {
-    const byFrom = await fetchTrips(`?limit=50&from=${encodeURIComponent('Москва')}`);
+    const byFrom = await fetchTrips(`?limit=50&from=${encodeURIComponent(ORENBURG)}`);
     const byRoute = await fetchTrips(
-      `?limit=50&from=${encodeURIComponent('Москва')}&to=${encodeURIComponent('Санкт-Петербург')}`,
+      `?limit=50&from=${encodeURIComponent(ORENBURG)}&to=${encodeURIComponent(SOL_ILETSK)}`,
     );
 
     expect(byRoute.items.length).toBeGreaterThan(0);
     expect(byRoute.items.length).toBeLessThan(byFrom.items.length);
     expect(
-      byRoute.items.every(
-        (trip) => trip.fromCity === 'Москва' && trip.toCity === 'Санкт-Петербург',
-      ),
+      byRoute.items.every((trip) => trip.fromCity === ORENBURG && trip.toCity === SOL_ILETSK),
     ).toBe(true);
+  });
+
+  it('направление учитывает порядок городов', async () => {
+    const there = await fetchTrips(
+      `?limit=50&from=${encodeURIComponent(ORENBURG)}&to=${encodeURIComponent(AKBULAK)}`,
+    );
+    const back = await fetchTrips(
+      `?limit=50&from=${encodeURIComponent(AKBULAK)}&to=${encodeURIComponent(ORENBURG)}`,
+    );
+
+    expect(there.items.length).toBeGreaterThan(0);
+    expect(back.items.length).toBeGreaterThan(0);
+
+    const thereIds = new Set(there.items.map((trip) => trip.id));
+    expect(back.items.some((trip) => thereIds.has(trip.id))).toBe(false);
+  });
+
+  it('в ленте только шесть направлений справочника', async () => {
+    const { items } = await fetchTrips('?limit=50');
+    const routes = new Set(items.map((trip) => `${trip.fromCity}→${trip.toCity}`));
+
+    expect(routes.size).toBeGreaterThan(0);
+    expect(routes.size).toBeLessThanOrEqual(6);
+    for (const route of routes) {
+      expect([
+        `${ORENBURG}→${SOL_ILETSK}`,
+        `${SOL_ILETSK}→${ORENBURG}`,
+        `${ORENBURG}→${AKBULAK}`,
+        `${AKBULAK}→${ORENBURG}`,
+        `${AKBULAK}→${SOL_ILETSK}`,
+        `${SOL_ILETSK}→${AKBULAK}`,
+      ]).toContain(route);
+    }
+  });
+
+  it('все цены в ленте укладываются в коридор 500–850 ₽', async () => {
+    const { items } = await fetchTrips('?limit=50');
+
+    expect(items.length).toBeGreaterThan(0);
+    for (const trip of items) {
+      expect(trip.priceRub).toBeGreaterThanOrEqual(500);
+      expect(trip.priceRub).toBeLessThanOrEqual(850);
+    }
+  });
+
+  it('все выезды в ленте стоят на сетке получасов', async () => {
+    const { items } = await fetchTrips('?limit=50');
+
+    expect(items.length).toBeGreaterThan(0);
+    for (const trip of items) {
+      const departAt = new Date(trip.departAt);
+      expect(departAt.getUTCSeconds()).toBe(0);
+      expect(departAt.getUTCMilliseconds()).toBe(0);
+      expect(departAt.getUTCMinutes() % 30).toBe(0);
+    }
   });
 
   it('фильтр по роли отдаёт только объявления этой роли', async () => {
@@ -94,18 +149,28 @@ describe('GET /api/trips — фильтры на сид-данных', () => {
     expect(drivers.items.length + passengers.items.length).toBe(all.items.length);
   });
 
-  it('priceMax отсекает дорогие поездки и поездки без цены', async () => {
-    const limit = 900;
+  it('priceMax отсекает дорогие поездки', async () => {
+    const limit = 600;
     const { items } = await fetchTrips(`?limit=50&priceMax=${limit}`);
 
     expect(items.length).toBeGreaterThan(0);
     for (const trip of items) {
-      expect(trip.priceRub).not.toBeNull();
-      expect(trip.priceRub!).toBeLessThanOrEqual(limit);
+      expect(trip.priceRub).toBeLessThanOrEqual(limit);
     }
 
     const all = await fetchTrips('?limit=50');
     expect(items.length).toBeLessThan(all.items.length);
+  });
+
+  it('priceMax вне коридора цен — 400', async () => {
+    for (const priceMax of [100, 1000]) {
+      const response = await ctx.app.inject({
+        method: 'GET',
+        url: `/api/trips?priceMax=${priceMax}`,
+        headers: authHeaders(VIEWER),
+      });
+      expect([priceMax, response.statusCode]).toEqual([priceMax, 400]);
+    }
   });
 
   it('seatsMin отсекает поездки без нужного числа свободных мест', async () => {
@@ -139,7 +204,7 @@ describe('GET /api/trips — фильтры на сид-данных', () => {
 
     expect(response.statusCode).toBe(400);
     expect(response.json()).toMatchObject({ error: { code: 'VALIDATION_FAILED' } });
-    expect(response.json().error.message).toMatch(/справочник/i);
+    expect(response.json().error.message).toMatch(/списке направлений/i);
   });
 
   it('курсорная пагинация идёт по возрастанию departAt и не теряет поездок', async () => {

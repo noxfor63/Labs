@@ -20,8 +20,21 @@ export default function setup(): void {
     execFileSync('npx', args, { cwd: apiRoot, env, stdio: 'inherit' });
   };
 
-  // Без --force-reset: схему синхронизирует обычный push, а данные
-  // всё равно полностью перезаписывает сид (он начинается с deleteMany).
-  run(['prisma', 'db', 'push']);
+  try {
+    // Без --force-reset: схему синхронизирует обычный push, а данные
+    // всё равно полностью перезаписывает сид (он начинается с deleteMany).
+    run(['prisma', 'db', 'push']);
+  } catch (error) {
+    // Самый частый случай — несовместимое изменение схемы поверх старых
+    // тестовых данных. Подсказываем, что делать, вместо стектрейса Prisma.
+    const dbName = TEST_DATABASE_URL.split('/').pop()?.split('?')[0] ?? 'тестовую базу';
+    throw new Error(
+      `Не удалось привести тестовую базу к схеме.\n` +
+        `Если схема менялась несовместимо, пересоздайте базу:\n` +
+        `  dropdb ${dbName} && createdb ${dbName}`,
+      { cause: error },
+    );
+  }
+
   run(['tsx', 'prisma/seed.ts']);
 }

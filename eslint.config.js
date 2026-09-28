@@ -41,7 +41,13 @@ export default tseslint.config(
 
   // --- Бэкенд и скрипты: среда Node ---
   {
-    files: ['apps/api/**/*.ts', 'packages/shared/**/*.ts', '*.js', '*.ts'],
+    files: [
+      'apps/api/**/*.ts',
+      'packages/shared/**/*.ts',
+      'scripts/**/*.{js,mjs}',
+      '*.js',
+      '*.ts',
+    ],
     languageOptions: {
       globals: { ...globals.node },
     },

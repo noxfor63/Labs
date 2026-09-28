@@ -12,7 +12,7 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "npm run dev -w @vk-rideshare/api & npm run dev -w @vk-rideshare/web & wait",
+    "dev": "node scripts/dev.mjs",
     "dev:api": "npm run dev -w @vk-rideshare/api",
     "dev:web": "npm run dev -w @vk-rideshare/web",
     "build": "npm run build -w @vk-rideshare/shared && npm run build -w @vk-rideshare/api && npm run build -w @vk-rideshare/web",
