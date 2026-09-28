@@ -25,6 +25,37 @@ packages/shared Справочник направлений, сетка выез
 нужно** — оно понадобится только для выкатки (см. [«Приложение во
 ВКонтакте»](#приложение-во-вконтакте)).
 
+## Какой терминал открыть
+
+На Windows подойдёт любой из двух, но команды в них местами различаются,
+поэтому дальше **каждый блок подписан**, куда его вставлять:
+
+- **cmd и PowerShell — одинаково** — вставляйте в тот, что открыт;
+- **cmd:** / **PowerShell:** — блоки различаются, берите свой;
+- **macOS и Linux** — для Windows не нужен.
+
+Где открыть:
+
+- **PowerShell** — правый клик по «Пуск» → «Терминал» или «Windows
+  PowerShell». Это вариант по умолчанию в Windows 10 и 11.
+- **cmd** — «Пуск» → наберите `cmd` → «Командная строка».
+
+**От имени администратора запускать не нужно** — ни здесь, ни дальше.
+Администраторский терминал открывается в `C:\Windows\System32`, куда вам
+нельзя писать, и клонирование там падает.
+
+Три различия, из-за которых блоки ниже подписаны отдельно:
+
+| | cmd | Windows PowerShell 5.1 |
+|---|---|---|
+| Объединить команды в строку | `команда1 && команда2` | `&&` не работает — пишите с новой строки |
+| Комментарий в конце строки | `#` **не** комментарий, он ломает команду | `#` — комментарий |
+| `curl` | это настоящий curl | это псевдоним `Invoke-WebRequest` — пишите `curl.exe` |
+
+Чтобы не держать это в голове, все команды ниже даны по одной на строку.
+
+---
+
 ## Шаг 0. Что должно быть установлено
 
 | Что | Версия | Проверить | Если нет |
@@ -38,11 +69,16 @@ packages/shared Справочник направлений, сетка выез
 который появился в этой версии. Отдельная библиотека для чтения `.env`
 проекту не нужна. Проверялось на Node 22.
 
-Проверка одной командой:
+Проверка. **cmd и PowerShell — одинаково**, по одной строке:
 
-```bash
-node -v && npm -v && git --version
 ```
+node -v
+npm -v
+git --version
+```
+
+(в cmd и в PowerShell 7 можно одной строкой через `&&`, но в Windows
+PowerShell 5.1 `&&` не работает — поэтому здесь по строкам)
 
 Ожидаемый вид ответа:
 
@@ -89,9 +125,10 @@ cd ~/projects
 в PowerShell, macOS и Linux) должен показать вашу папку, а не
 `C:\Windows\System32` и не корень диска.
 
-Теперь клонируйте:
+Теперь клонируйте. **cmd и PowerShell — одинаково** (и то же самое на
+macOS и Linux):
 
-```bash
+```
 git clone https://github.com/noxfor63/Labs.git
 cd Labs
 git checkout claude/vk-rideshare-mini-app-qqbdhb
@@ -116,14 +153,28 @@ added 494 packages in 43s
 ```
 
 **Проверка, что шаг удался** — каталог `packages/shared/dist` существует и
-не пуст:
+не пуст.
 
-```bash
-ls packages/shared/dist
-# cities.d.ts  cities.js  domain.d.ts  domain.js  index.d.ts  index.js  ...
+**cmd:**
+
+```
+dir packages\shared\dist
 ```
 
-Если каталога нет, соберите вручную: `npm run build -w @vk-rideshare/shared`.
+**PowerShell, macOS и Linux:**
+
+```
+ls packages/shared/dist
+```
+
+Должны увидеть `cities.js`, `domain.js`, `index.js`, `schedule.js`,
+`schemas.js` и одноимённые файлы `.d.ts`.
+
+Если каталога нет, соберите вручную — **cmd и PowerShell одинаково**:
+
+```
+npm run build -w @vk-rideshare/shared
+```
 
 ---
 
@@ -157,16 +208,16 @@ Docker Desktop не запускается.
 что он работает: «Службы» → `postgresql-x64-16` → состояние
 «Выполняется».
 
-**macOS:**
+**macOS** (в Терминал, Windows этот блок не касается):
 
-```bash
+```
 brew install postgresql@16
 brew services start postgresql@16
 ```
 
-**Linux (Debian/Ubuntu):**
+**Linux, Debian/Ubuntu** (в терминал):
 
-```bash
+```
 sudo apt install postgresql-16
 sudo systemctl start postgresql
 ```
@@ -184,7 +235,9 @@ postgresql://postgres:ВАШ_ПАРОЛЬ@localhost:5432/vk_rideshare?schema=pub
 
 В репозитории лежит готовый `docker-compose.yml`.
 
-```bash
+**cmd и PowerShell — одинаково:**
+
+```
 docker compose up -d --wait
 ```
 
@@ -192,12 +245,17 @@ docker compose up -d --wait
 ещё несколько секунд поднимается, и следующий шаг падает с ошибкой
 подключения. С `--wait` команда ждёт, пока healthcheck станет зелёным.
 
-Проверка:
+Проверка — **cmd и PowerShell одинаково**:
 
-```bash
+```
 docker compose ps
-# NAME               IMAGE               STATUS
-# vk-rideshare-db    postgres:16-alpine  Up 12 seconds (healthy)
+```
+
+Вывод:
+
+```
+NAME               IMAGE               STATUS
+vk-rideshare-db    postgres:16-alpine  Up 12 seconds (healthy)
 ```
 
 Контейнер поднимается с такими параметрами (это значения по умолчанию из
@@ -240,9 +298,20 @@ postgresql://rideshare:rideshare@localhost:5432/vk_rideshare?schema=public
 в репозиторий не попадает; рядом лежит шаблон `.env.example` с одними
 только именами переменных.
 
-```bash
+**cmd:**
+
+```
+copy .env.example .env
+```
+
+**PowerShell, macOS и Linux:**
+
+```
 cp .env.example .env
 ```
+
+Открыть файл на редактирование — **cmd:** `notepad .env`,
+**PowerShell:** `notepad .env`, **macOS:** `open -e .env`.
 
 Теперь откройте `.env` и заполните **три** строки. Остальные можно оставить
 пустыми — пустое значение считается «не задано», и подставляется значение
@@ -270,11 +339,13 @@ postgresql://  rideshare : rideshare @ localhost : 5432 / vk_rideshare ?schema=p
 VK_APP_SECRET=local-dev-secret-change-me
 ```
 
-Сгенерировать что-то посерьёзнее:
+Сгенерировать что-то посерьёзнее — **cmd и PowerShell одинаково**:
 
-```bash
+```
 node -e "console.log(require('node:crypto').randomBytes(24).toString('base64url'))"
 ```
+
+Скопируйте напечатанную строку в `VK_APP_SECRET`.
 
 Пустым оставлять **нельзя**: приложение запустится, но каждый запрос к API
 вернёт `401` с текстом `Защищённый ключ приложения не настроен`.
@@ -333,7 +404,9 @@ VITE_API_BASE_URL=
 
 ## Шаг 4. Накатить схему на базу
 
-```bash
+**cmd и PowerShell — одинаково:**
+
+```
 npm run db:push
 ```
 
@@ -363,7 +436,9 @@ PostgreSQL database vk_rideshare created at localhost:5432
 
 ## Шаг 5. Залить сид-данные
 
-```bash
+**cmd и PowerShell — одинаково:**
+
+```
 npm run db:seed
 ```
 
@@ -396,7 +471,9 @@ npm run db:seed
 
 ## Шаг 6. Запустить приложение
 
-```bash
+**cmd и PowerShell — одинаково:**
+
+```
 npm run dev
 ```
 
@@ -407,12 +484,19 @@ npm run dev
 | API | <http://localhost:3000> | Fastify, перезапускается сам при правке кода |
 | Фронтенд | <http://localhost:5173> | Vite, горячая перезагрузка |
 
-**На Windows** `npm run dev` не сработает (используется синтаксис `&` из
-POSIX-оболочек). Откройте два терминала:
+Если хочется видеть их логи раздельно — откройте два терминала (любых:
+хоть два cmd, хоть два PowerShell, хоть по одному).
 
-```bash
-npm run dev:api    # в первом
-npm run dev:web    # во втором
+В первом, **cmd и PowerShell одинаково**:
+
+```
+npm run dev:api
+```
+
+Во втором, **cmd и PowerShell одинаково**:
+
+```
+npm run dev:web
 ```
 
 ### Что должно получиться
@@ -429,18 +513,35 @@ npm run dev:web    # во втором
 - на вкладке «Профиль» — Анна Ковалёва с рейтингом и отзывами;
 - в консоли браузера **пусто**.
 
-Быстрая проверка из терминала, не открывая браузер:
+Быстрая проверка из терминала, не открывая браузер. Откройте **второй**
+терминал — первый занят запущенным приложением.
 
-```bash
+**cmd:**
+
+```
 curl -s http://localhost:3000/health
-# {"status":"ok"}
-
-curl -s "http://localhost:3000/api/trips?limit=1" | head -c 120
-# {"items":[{"id":"seed-active-1","role":"PASSENGER","fromCity":"Оренбург", ...
+curl -s "http://localhost:3000/api/trips?limit=1"
 ```
 
-Второй запрос идёт без заголовка `X-Launch-Params` и проходит именно
-потому, что сработал моковый режим из шага 3.3.
+**PowerShell** — здесь именно `curl.exe`, потому что `curl` в Windows
+PowerShell 5.1 это псевдоним `Invoke-WebRequest` и ключ `-s` он не знает:
+
+```
+curl.exe -s http://localhost:3000/health
+curl.exe -s "http://localhost:3000/api/trips?limit=1"
+```
+
+**macOS и Linux:**
+
+```
+curl -s http://localhost:3000/health
+curl -s "http://localhost:3000/api/trips?limit=1" | head -c 120
+```
+
+Первая команда печатает `{"status":"ok"}`, вторая — ленту поездок,
+начинающуюся с `{"items":[{"id":"seed-active-1"`. Второй запрос идёт без
+заголовка `X-Launch-Params` и проходит именно потому, что сработал
+моковый режим из шага 3.3.
 
 ---
 
@@ -457,7 +558,9 @@ VK_MOCK_LAUNCH_PARAMS=vk_user_id=1000004&vk_app_id=51234567&vk_platform=desktop_
 **2. Сгенерировать полную подписанную строку** и открыть приложение с ней —
 перезапускать ничего не нужно:
 
-```bash
+**cmd и PowerShell — одинаково:**
+
+```
 npm run gen:launch-params -w @vk-rideshare/api -- --user 1000003
 ```
 
@@ -520,7 +623,7 @@ vk_access_token_settings=&vk_app_id=0&vk_are_notifications_enabled=0&...&sign=uc
 | `destination path 'Labs' already exists and is not an empty directory` | Папка от прошлой попытки | Зайдите в неё и продолжите с `git checkout`, либо удалите её и клонируйте заново |
 | `Cannot find module '@vk-rideshare/shared'` | Не собран общий пакет | `npm run build -w @vk-rideshare/shared` |
 | `Не удалось привести тестовую базу к схеме` при `npm run test` | Схема менялась несовместимо поверх старых тестовых данных | Удалите базу — тесты создадут её заново: `psql -U postgres -c "DROP DATABASE IF EXISTS vk_rideshare_test"` |
-| `npm run dev` на Windows ничего не делает | Синтаксис `&` из POSIX-оболочки | `npm run dev:api` и `npm run dev:web` в двух терминалах |
+| `npm run dev` запустил только один процесс | Порт 3000 или 5173 занят — второй процесс упал, и запускающий скрипт погасил оба | Посмотрите, что напечатано в терминале: там будет `EADDRINUSE` с номером порта. Освободите порт или смените его в `.env` |
 | Запросы уходят на `/api/...` вместо `localhost:3000` | В `VITE_API_BASE_URL` мусор | Оставьте пустым — подставится `http://localhost:3000/api` |
 
 Правку `.env` **фронтенд подхватывает только после перезапуска** Vite:
@@ -534,33 +637,45 @@ vk_access_token_settings=&vk_app_id=0&vk_are_notifications_enabled=0&...&sign=uc
 процесса гаснут вместе.
 
 **Вернуть сид-данные в исходное состояние**, базу не трогая, — на любом
-варианте из шага 2:
+варианте из шага 2. **cmd и PowerShell одинаково:**
 
-```bash
+```
 npm run db:seed
 ```
 
-**Начать с полностью чистой базы.** Если Postgres стоит в системе:
+**Начать с полностью чистой базы.** Если Postgres стоит в системе —
+**cmd и PowerShell одинаково**, по одной команде за раз:
 
-```bash
-# Windows: psql лежит в C:\Program Files\PostgreSQL\16\bin
+```
 psql -U postgres -c "DROP DATABASE IF EXISTS vk_rideshare"
-npm run db:push && npm run db:seed    # базу создаст сам db:push
+npm run db:push
+npm run db:seed
 ```
 
-Если Postgres в Docker:
+Базу пересоздаст сам `db:push`. Если `psql` не находится, он лежит в
+`C:\Program Files\PostgreSQL\16\bin` — либо добавьте эту папку в PATH,
+либо вызовите по полному пути:
+`"C:\Program Files\PostgreSQL\16\bin\psql.exe" -U postgres -c "DROP DATABASE IF EXISTS vk_rideshare"`.
 
-```bash
-docker compose stop        # остановить, данные останутся
-docker compose down        # удалить контейнер, данные останутся в томе
-docker compose down -v     # удалить вместе с данными
-docker compose up -d --wait && npm run db:push && npm run db:seed
+Если Postgres в Docker — **cmd и PowerShell одинаково**:
+
 ```
+docker compose down -v
+docker compose up -d --wait
+npm run db:push
+npm run db:seed
+```
+
+`docker compose stop` останавливает базу, сохраняя данные;
+`docker compose down` удаляет контейнер, но оставляет том с данными;
+`down -v` сносит и том — это и есть «с чистого листа».
 
 Посмотреть, что лежит в базе, глазами:
 
-```bash
-npm run db:studio     # Prisma Studio; адрес команда печатает сама
+**cmd и PowerShell — одинаково:**
+
+```
+npm run db:studio
 ```
 
 Порт Prisma Studio выбирает при запуске, поэтому смотрите строку
@@ -574,7 +689,7 @@ npm run db:studio     # Prisma Studio; адрес команда печатае�
 | Команда | Что делает |
 |---|---|
 | `npm run dev` | API и фронтенд одновременно |
-| `npm run dev:api` / `npm run dev:web` | по отдельности (и для Windows) |
+| `npm run dev:api` / `npm run dev:web` | по отдельности, в двух терминалах |
 | `npm run build` | сборка shared → api → web |
 | `npm run lint` | ESLint по всему репозиторию |
 | `npm run test` | тесты API и фронтенда |
@@ -587,7 +702,9 @@ npm run db:studio     # Prisma Studio; адрес команда печатае�
 
 ### Тесты
 
-```bash
+**cmd и PowerShell — одинаково:**
+
+```
 npm run test
 ```
 
@@ -686,9 +803,9 @@ npm run test
    VITE_API_BASE_URL=https://api.вашдомен/api
    ```
 
-2. Соберите статику:
+2. Соберите статику — **cmd и PowerShell одинаково**:
 
-   ```bash
+   ```
    npm run build -w @vk-rideshare/web
    ```
 
@@ -706,7 +823,9 @@ npm run test
    разводит staging- и production-версии. В зависимости проекта пакет
    намеренно не добавлен: это инструмент выкатки, а не код приложения.
 
-   ```bash
+   **cmd и PowerShell — одинаково:**
+
+   ```
    npx @vkontakte/vk-miniapps-deploy
    ```
 
@@ -721,18 +840,34 @@ npm run test
 себе. Ему нужны `DATABASE_URL`, `VK_APP_SECRET`, `NODE_ENV=production` и
 `CORS_ORIGIN` с доменом от хостинга.
 
-```bash
+**cmd и PowerShell — одинаково**, по одной команде за раз (вторая
+применяет миграции):
+
+```
 npm run build -w @vk-rideshare/api
-npm run db:deploy -w @vk-rideshare/api   # применить миграции
+npm run db:deploy -w @vk-rideshare/api
 npm run start -w @vk-rideshare/api
 ```
 
-Проверьте после выкатки, что моковый вход действительно закрыт:
+Проверьте после выкатки, что моковый вход действительно закрыт.
 
-```bash
+**cmd, macOS и Linux:**
+
+```
 curl -i https://api.вашдомен/api/trips
-# HTTP/1.1 401 Unauthorized
-# {"error":{"code":"UNAUTHORIZED","message":"Заголовок X-Launch-Params отсутствует"}}
+```
+
+**PowerShell** (снова `curl.exe`, а не `curl`):
+
+```
+curl.exe -i https://api.вашдомен/api/trips
+```
+
+Ожидаемый ответ:
+
+```
+HTTP/1.1 401 Unauthorized
+{"error":{"code":"UNAUTHORIZED","message":"Заголовок X-Launch-Params отсутствует"}}
 ```
 
 ---
