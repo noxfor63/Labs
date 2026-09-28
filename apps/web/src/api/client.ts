@@ -22,7 +22,21 @@ import {
 
 import { getLaunchParams } from './launch-params.js';
 
-const BASE_URL: string = import.meta.env['VITE_API_BASE_URL'] ?? 'http://localhost:3000/api';
+/**
+ * VITE_API_BASE_URL из корневого .env, подставленный сборкой
+ * (см. define в apps/web/vite.config.ts). В тестах константы нет —
+ * от этого спасает проверка через typeof.
+ *
+ * Пустая строка — это «не задано»: `??` её не ловит, и все запросы
+ * ушли бы на относительный путь вместо API.
+ */
+declare const __API_BASE_URL__: string | undefined;
+
+const configuredBaseUrl = typeof __API_BASE_URL__ === 'string' ? __API_BASE_URL__ : '';
+const BASE_URL: string =
+  configuredBaseUrl.trim() !== ''
+    ? configuredBaseUrl.trim().replace(/\/+$/, '')
+    : 'http://localhost:3000/api';
 
 /** Ошибка, у которой есть машиночитаемый код из контракта API. */
 export class ApiRequestError extends Error {

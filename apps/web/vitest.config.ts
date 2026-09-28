@@ -1,13 +1,10 @@
-import { fileURLToPath } from 'node:url';
-
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
-const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
-
+// Корневой .env тестам не нужен, а Vite вытащил бы из него NODE_ENV
+// бэкенда — см. комментарий в vite.config.ts.
 export default defineConfig({
   plugins: [react()],
-  envDir: repoRoot,
   test: {
     environment: 'jsdom',
     globals: false,

@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { parseEnv } from '../src/env.js';
 import {
   TEST_SECRET,
   authHeaders,
@@ -140,5 +141,49 @@ describe('моковые launch-параметры', () => {
     expect(() => makeEnv({ NODE_ENV: 'production', VK_APP_SECRET: '' })).toThrow(
       /VK_APP_SECRET/,
     );
+  });
+});
+
+describe('разбор конфигурации', () => {
+  it('пустые значения из .env.example заменяются значениями по умолчанию', () => {
+    // Человек скопировал .env.example и заполнил только обязательное.
+    const env = parseEnv({
+      NODE_ENV: '',
+      DATABASE_URL: 'postgresql://user:pass@127.0.0.1:5432/db?schema=public',
+      API_PORT: '',
+      API_HOST: '',
+      CORS_ORIGIN: '',
+      VK_APP_ID: '',
+      VK_APP_SECRET: 'secret',
+      VK_MOCK_LAUNCH_PARAMS: '',
+    });
+
+    expect(env.NODE_ENV).toBe('development');
+    expect(env.API_PORT).toBe(3000);
+    expect(env.API_HOST).toBe('0.0.0.0');
+    expect(env.corsOrigins).toEqual([
+      'http://localhost:5173',
+      'http://127.0.0.1:5173',
+    ]);
+    expect(env.isProduction).toBe(false);
+  });
+
+  it('без DATABASE_URL падает с понятным сообщением', () => {
+    expect(() => parseEnv({ VK_APP_SECRET: 'secret' })).toThrow(
+      /DATABASE_URL обязателен/,
+    );
+  });
+
+  it('CORS_ORIGIN со списком доменов разбирается в массив', () => {
+    const env = parseEnv({
+      DATABASE_URL: 'postgresql://user:pass@127.0.0.1:5432/db?schema=public',
+      CORS_ORIGIN: 'https://app.example.com, https://staging.example.com ',
+      VK_APP_SECRET: 'secret',
+    });
+
+    expect(env.corsOrigins).toEqual([
+      'https://app.example.com',
+      'https://staging.example.com',
+    ]);
   });
 });
