@@ -30,8 +30,9 @@ export default function setup(): void {
     const dbName = TEST_DATABASE_URL.split('/').pop()?.split('?')[0] ?? 'тестовую базу';
     throw new Error(
       `Не удалось привести тестовую базу к схеме.\n` +
-        `Если схема менялась несовместимо, пересоздайте базу:\n` +
-        `  dropdb ${dbName} && createdb ${dbName}`,
+        `Если схема менялась несовместимо, просто удалите базу — эта\n` +
+        `подготовка создаст её заново:\n` +
+        `  psql -U postgres -c "DROP DATABASE IF EXISTS ${dbName}"`,
       { cause: error },
     );
   }

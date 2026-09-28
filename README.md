@@ -32,7 +32,7 @@ packages/shared Справочник направлений, сетка выез
 | **Node.js** | **20.12 или новее** | `node -v` | <https://nodejs.org/> или `nvm install 22` |
 | **npm** | 10 или новее | `npm -v` | Ставится вместе с Node.js |
 | **Git** | любая | `git --version` | <https://git-scm.com/downloads> |
-| **Postgres 16** | — | см. шаг 2 | Проще всего через Docker |
+| **Postgres 16** | — | см. шаг 2 | Установщик под вашу систему; Docker не обязателен |
 
 Почему именно 20.12: код читает `.env` встроенным `process.loadEnvFile()`,
 который появился в этой версии. Отдельная библиотека для чтения `.env`
@@ -94,9 +94,58 @@ ls packages/shared/dist
 
 ## Шаг 2. Поднять Postgres
 
-Нужен Postgres 16. Выберите **один** из трёх вариантов.
+Нужен Postgres 16. Выберите **один** из трёх вариантов — приложению
+безразлично, откуда база.
 
-### Вариант А — через Docker (рекомендуется)
+> **Базу создавать руками не нужно.** Если её нет, `npm run db:push` из
+> шага 4 создаст её сам и напишет `PostgreSQL database vk_rideshare
+> created`. Достаточно, чтобы сам сервер Postgres был запущен и
+> `DATABASE_URL` был правильным.
+
+### Вариант А — Postgres прямо в системе (работает везде)
+
+Не требует ни Docker, ни виртуализации. Самый надёжный путь, если
+Docker Desktop не запускается.
+
+**Windows.** Скачайте установщик с
+<https://www.postgresql.org/download/windows/> (сборка EDB), поставьте
+версию 16. В мастере:
+
+1. Компоненты: достаточно **PostgreSQL Server** и **Command Line Tools**,
+   pgAdmin по желанию.
+2. Пароль для пользователя `postgres` — **запомните его**, он пойдёт в
+   `DATABASE_URL`.
+3. Порт оставьте `5432`.
+4. Stack Builder в конце можно закрыть, он не нужен.
+
+Сервер ставится службой и стартует сам при загрузке Windows. Проверить,
+что он работает: «Службы» → `postgresql-x64-16` → состояние
+«Выполняется».
+
+**macOS:**
+
+```bash
+brew install postgresql@16
+brew services start postgresql@16
+```
+
+**Linux (Debian/Ubuntu):**
+
+```bash
+sudo apt install postgresql-16
+sudo systemctl start postgresql
+```
+
+**Строка подключения для шага 3** — с вашим пользователем и паролем:
+
+```
+postgresql://postgres:ВАШ_ПАРОЛЬ@localhost:5432/vk_rideshare?schema=public
+```
+
+На macOS и Linux пользователь обычно совпадает с вашим системным именем,
+а пароля может не быть вовсе — тогда `postgresql://localhost:5432/vk_rideshare?schema=public`.
+
+### Вариант Б — через Docker
 
 В репозитории лежит готовый `docker-compose.yml`.
 
@@ -132,29 +181,21 @@ docker compose ps
 postgresql://rideshare:rideshare@localhost:5432/vk_rideshare?schema=public
 ```
 
+> **Docker на Windows требует виртуализации.** Если Docker Desktop пишет
+> «Virtualization support not detected» или «failed to connect to the
+> docker API at npipe:…», см. таблицу ошибок ниже — и не тратьте время,
+> берите вариант А, он ничем не хуже.
+
 > Если порт 5432 на машине уже занят другим Postgres — задайте в `.env`
 > `POSTGRES_PORT=5433` и укажите этот же порт в `DATABASE_URL`.
 
-### Вариант Б — Postgres, установленный в систему
+### Вариант В — готовый Postgres: корпоративный или облачный
 
-```bash
-# Linux
-sudo -u postgres createdb vk_rideshare
-
-# macOS (Homebrew)
-createdb vk_rideshare
-```
-
-Строка подключения — с вашим пользователем и паролем, например:
-
-```
-postgresql://postgres:postgres@localhost:5432/vk_rideshare?schema=public
-```
-
-### Вариант В — уже есть Postgres (свой, облачный, общий)
-
-Создайте пустую базу и возьмите её строку подключения. Ничего больше не
-требуется: схему накатит шаг 4.
+Подойдёт любой доступный сервер Postgres 16, в том числе бесплатный
+облачный. Ничего ставить локально не нужно — возьмите строку подключения
+и вставьте её в `DATABASE_URL`. Если база на сервере ещё не создана и у
+вашего пользователя есть право `CREATEDB`, шаг 4 создаст её сам; если
+права нет — попросите создать пустую базу, остальное сделает миграция.
 
 ---
 
@@ -229,7 +270,9 @@ VK_MOCK_LAUNCH_PARAMS=vk_user_id=1000001&vk_app_id=51234567&vk_platform=desktop_
 
 ### Готовый минимальный `.env`
 
-Вот файл целиком, который точно работает (вариант А из шага 2):
+Вот файл целиком, который точно работает. `DATABASE_URL` здесь — для
+Postgres, установленного в систему (вариант А из шага 2); для Docker
+подставьте `rideshare:rideshare` вместо `postgres:ВАШ_ПАРОЛЬ`.
 
 ```dotenv
 POSTGRES_USER=
@@ -237,7 +280,7 @@ POSTGRES_PASSWORD=
 POSTGRES_DB=
 POSTGRES_PORT=
 
-DATABASE_URL=postgresql://rideshare:rideshare@localhost:5432/vk_rideshare?schema=public
+DATABASE_URL=postgresql://postgres:ВАШ_ПАРОЛЬ@localhost:5432/vk_rideshare?schema=public
 
 API_PORT=
 API_HOST=
@@ -261,16 +304,18 @@ npm run db:push
 
 Команда читает `apps/api/prisma/schema.prisma` и приводит базу к нему:
 создаёт таблицы `users`, `trips`, `trip_requests`, `reviews`, перечисления
-и индексы. База должна существовать, но быть пустой — таблицы создаст сама
-команда.
+и индексы. Если базы ещё нет, команда создаёт её сама — вручную ничего
+создавать не нужно.
 
-Успешный вывод:
+Успешный вывод (строка про `created` появляется, только если базы не было):
 
 ```
 Prisma schema loaded from prisma/schema.prisma.
 Datasource "db": PostgreSQL database "vk_rideshare", schema "public" at "localhost:5432"
 
-🚀  Your database is now in sync with your Prisma schema. Done in 194ms
+PostgreSQL database vk_rideshare created at localhost:5432
+
+🚀  Your database is now in sync with your Prisma schema. Done in 181ms
 ```
 
 > `db:push` против `db:migrate`: `db:push` просто синхронизирует схему и
@@ -422,7 +467,10 @@ vk_access_token_settings=&vk_app_id=0&vk_are_notifications_enabled=0&...&sign=uc
 |---|---|---|
 | `Некорректная конфигурация окружения — DATABASE_URL обязателен` | Нет `.env` или в нём пустой `DATABASE_URL` | Шаг 3.1 |
 | `Некорректная конфигурация окружения — VK_APP_SECRET обязателен при NODE_ENV=production` | `NODE_ENV=production` без ключа | Заполните `VK_APP_SECRET` либо уберите `NODE_ENV` из `.env` |
-| `Error: P1001: Can't reach database server at 'localhost:5432'` при `db:push` | Postgres не запущен, не тот порт или база не создана | `docker compose ps` — контейнер должен быть `(healthy)`. Сверьте порт в `DATABASE_URL` |
+| `Error: P1001: Can't reach database server at 'localhost:5432'` при `db:push` | Postgres не запущен или указан не тот порт | Проверьте, что сервер работает (служба `postgresql-x64-16` на Windows, `docker compose ps` для контейнера), и сверьте порт в `DATABASE_URL`. Саму базу создавать не нужно — `db:push` создаст её |
+| `Docker Desktop failed to start… Virtualization support not detected` | В BIOS/UEFI выключена аппаратная виртуализация (Intel VT-x / AMD-V) либо её запрещает политика компании | Включите её в BIOS (обычно `Intel Virtualization Technology` или `SVM Mode`) и компоненты Windows «Платформа виртуальной машины» и WSL2. Если машина корпоративная и доступа к BIOS нет — **берите вариант А из шага 2**, Docker для этого проекта не обязателен |
+| `failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine` | Docker Desktop установлен, но не запущен | Запустите Docker Desktop и дождитесь статуса **Running** в трее, затем повторите команду |
+| `password authentication failed for user "postgres"` | В `DATABASE_URL` не тот пароль, который задавался при установке Postgres | Исправьте пароль в `DATABASE_URL`. Забыли — переустановите Postgres или смените пароль через pgAdmin |
 | `401 {"code":"UNAUTHORIZED","message":"Заголовок X-Launch-Params отсутствует"}` | Пустой `VK_MOCK_LAUNCH_PARAMS` | Шаг 3.3, затем перезапустите API |
 | `401 ... "Защищённый ключ приложения не настроен"` | Пустой `VK_APP_SECRET` | Шаг 3.2 |
 | `401 ... "Подпись launch-параметров не совпала"` | Строка в адресе подписана другим ключом | Перегенерируйте: `npm run gen:launch-params` |
@@ -434,7 +482,7 @@ vk_access_token_settings=&vk_app_id=0&vk_are_notifications_enabled=0&...&sign=uc
 | `EADDRINUSE: address already in use :::3000` | Порт занят | `API_PORT=3001` в `.env` и `VITE_API_BASE_URL=http://localhost:3001/api` |
 | `Port 5173 is in use` | Порт занят | Vite сам возьмёт 5174 и напишет об этом; добавьте новый адрес в `CORS_ORIGIN` |
 | `Cannot find module '@vk-rideshare/shared'` | Не собран общий пакет | `npm run build -w @vk-rideshare/shared` |
-| `Не удалось привести тестовую базу к схеме` при `npm run test` | Схема менялась несовместимо поверх старых тестовых данных | `dropdb vk_rideshare_test && createdb vk_rideshare_test` — сид наполнит её заново |
+| `Не удалось привести тестовую базу к схеме` при `npm run test` | Схема менялась несовместимо поверх старых тестовых данных | Удалите базу — тесты создадут её заново: `psql -U postgres -c "DROP DATABASE IF EXISTS vk_rideshare_test"` |
 | `npm run dev` на Windows ничего не делает | Синтаксис `&` из POSIX-оболочки | `npm run dev:api` и `npm run dev:web` в двух терминалах |
 | Запросы уходят на `/api/...` вместо `localhost:3000` | В `VITE_API_BASE_URL` мусор | Оставьте пустым — подставится `http://localhost:3000/api` |
 
@@ -445,21 +493,31 @@ vk_access_token_settings=&vk_app_id=0&vk_are_notifications_enabled=0&...&sign=uc
 
 ## Остановить и сбросить
 
+Приложение останавливается `Ctrl+C` в терминале с `npm run dev` — оба
+процесса гаснут вместе.
+
+**Вернуть сид-данные в исходное состояние**, базу не трогая, — на любом
+варианте из шага 2:
+
 ```bash
-# остановить приложение
-Ctrl+C в терминале с npm run dev
-
-# остановить базу, данные останутся
-docker compose stop
-
-# остановить и удалить контейнер, данные останутся в томе
-docker compose down
-
-# удалить вместе с данными — начать с чистого листа
-docker compose down -v
-
-# вернуть сид-данные в исходное состояние, базу не трогая
 npm run db:seed
+```
+
+**Начать с полностью чистой базы.** Если Postgres стоит в системе:
+
+```bash
+# Windows: psql лежит в C:\Program Files\PostgreSQL\16\bin
+psql -U postgres -c "DROP DATABASE IF EXISTS vk_rideshare"
+npm run db:push && npm run db:seed    # базу создаст сам db:push
+```
+
+Если Postgres в Docker:
+
+```bash
+docker compose stop        # остановить, данные останутся
+docker compose down        # удалить контейнер, данные останутся в томе
+docker compose down -v     # удалить вместе с данными
+docker compose up -d --wait && npm run db:push && npm run db:seed
 ```
 
 Посмотреть, что лежит в базе, глазами:
@@ -496,10 +554,10 @@ npm run db:studio     # Prisma Studio; адрес команда печатае�
 npm run test
 ```
 
-Тесты API поднимают **отдельную** базу `vk_rideshare_test` на том же
-сервере Postgres, накатывают схему и прогоняют сид — рабочая база
-`vk_rideshare` не страдает. Имя базы меняется переменной
-`TEST_DATABASE_URL`.
+Тесты API работают с **отдельной** базой `vk_rideshare_test` на том же
+сервере Postgres: создают её, если её нет, накатывают схему и прогоняют
+сид — рабочая база `vk_rideshare` не страдает. Имя базы меняется
+переменной `TEST_DATABASE_URL`.
 
 То есть Postgres из шага 2 должен быть запущен и для тестов тоже.
 
