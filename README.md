@@ -59,12 +59,47 @@ git version 2.43.0
 
 ## Шаг 1. Склонировать репозиторий и поставить зависимости
 
+Сначала **перейдите в папку, куда вам разрешено писать**. Терминал часто
+открывается в системном каталоге — `C:\Windows\System32` для cmd,
+запущенного от имени администратора, — и клонирование туда падает с
+`could not create work tree dir 'Labs': Permission denied`.
+
+**Windows, cmd:**
+
+```bat
+mkdir %USERPROFILE%\projects
+cd /d %USERPROFILE%\projects
+```
+
+**Windows, PowerShell:**
+
+```powershell
+mkdir $HOME\projects -Force
+cd $HOME\projects
+```
+
+**macOS и Linux:**
+
+```bash
+mkdir -p ~/projects
+cd ~/projects
+```
+
+Проверьте, что вы действительно там: `cd` без аргументов в cmd (или `pwd`
+в PowerShell, macOS и Linux) должен показать вашу папку, а не
+`C:\Windows\System32` и не корень диска.
+
+Теперь клонируйте:
+
 ```bash
 git clone https://github.com/noxfor63/Labs.git
 cd Labs
 git checkout claude/vk-rideshare-mini-app-qqbdhb
 npm install
 ```
+
+> Запускать терминал от имени администратора для этого проекта не нужно —
+> ни для клонирования, ни для установки зависимостей, ни для запуска.
 
 `npm install` делает **три** вещи, а не одну:
 
@@ -481,6 +516,8 @@ vk_access_token_settings=&vk_app_id=0&vk_are_notifications_enabled=0&...&sign=uc
 | Все поездки пропали из ленты через несколько дней | Лента показывает только будущие поездки | `npm run db:seed` пересчитает даты от «сейчас» |
 | `EADDRINUSE: address already in use :::3000` | Порт занят | `API_PORT=3001` в `.env` и `VITE_API_BASE_URL=http://localhost:3001/api` |
 | `Port 5173 is in use` | Порт занят | Vite сам возьмёт 5174 и напишет об этом; добавьте новый адрес в `CORS_ORIGIN` |
+| `fatal: could not create work tree dir 'Labs': Permission denied` при `git clone` | Терминал находится в каталоге, куда вам нельзя писать — обычно `C:\Windows\System32` (cmd «от имени администратора») или корень диска | Перейдите в свою папку и повторите: `cd /d %USERPROFILE%\projects` (cmd) или `cd ~/projects` (macOS, Linux). Администратором запускать не нужно |
+| `destination path 'Labs' already exists and is not an empty directory` | Папка от прошлой попытки | Зайдите в неё и продолжите с `git checkout`, либо удалите её и клонируйте заново |
 | `Cannot find module '@vk-rideshare/shared'` | Не собран общий пакет | `npm run build -w @vk-rideshare/shared` |
 | `Не удалось привести тестовую базу к схеме` при `npm run test` | Схема менялась несовместимо поверх старых тестовых данных | Удалите базу — тесты создадут её заново: `psql -U postgres -c "DROP DATABASE IF EXISTS vk_rideshare_test"` |
 | `npm run dev` на Windows ничего не делает | Синтаксис `&` из POSIX-оболочки | `npm run dev:api` и `npm run dev:web` в двух терминалах |
