@@ -47,3 +47,30 @@ ImageMagick, ни Pillow в окружении сборки нет, а Chromium 
 разработчика: проверить их из окружения сборки я не могу, поэтому
 исходник векторный, а PNG пересобирается в любой нужный размер одной
 командой.
+
+---
+
+# Экраны
+
+Сняты headless-Chromium'ом на сид-данных, ширина 560.
+
+| Поиск | Создание | Мои поездки |
+|---|---|---|
+| ![Поиск](screens/search.png) | ![Создание](screens/create.png) | ![Мои](screens/my.png) |
+
+На «Моих поездках» видно, как выглядит закрытая поездка: карточка
+приглушена. Пересняты командой из корня репозитория при поднятом
+`npm run dev`:
+
+```
+python3 - <<'PY'
+import subprocess
+for path, name in [("", "search"), ("#/create", "create"), ("#/my", "my")]:
+    subprocess.run([
+        "/opt/pw-browsers/chromium", "--headless", "--no-sandbox", "--disable-gpu",
+        "--hide-scrollbars", "--virtual-time-budget=8000",
+        f"--screenshot=design/screens/{name}.png", "--window-size=560,900",
+        f"http://127.0.0.1:5173/{path}",
+    ], capture_output=True)
+PY
+```
