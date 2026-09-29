@@ -369,30 +369,57 @@ copy .env.example .env
 cp .env.example .env
 ```
 
-Открыть файл на редактирование — **cmd:** `notepad .env`,
-**PowerShell:** `notepad .env`, **macOS:** `open -e .env`.
+Теперь откройте файл в блокноте — **cmd и PowerShell одинаково**:
 
-Теперь откройте `.env` и заполните **три** строки. Остальные можно оставить
-пустыми — пустое значение считается «не задано», и подставляется значение
-по умолчанию.
+```
+notepad .env
+```
+
+(на macOS: `open -e .env`, на Linux: `nano .env`)
+
+> ⚠️ **Дальше в этом шаге — содержимое файла, а не команды.**
+> Строки вида `DATABASE_URL=…` нужно вписать **в открывшийся блокнот** и
+> сохранить (Ctrl+S). Если вставить такую строку в терминал, cmd ответит
+> «"DATABASE_URL" не является внутренней или внешней командой» — он прав,
+> это не команда.
+
+В файле уже есть все имена переменных с пустыми значениями — найдите
+нужную строку и допишите значение после знака `=`. Заполнить надо **три**
+строки, остальные оставьте пустыми: пустое значение считается «не
+задано», и подставляется значение по умолчанию.
 
 ### 3.1. `DATABASE_URL` — строка подключения из шага 2
+
+Найдите в блокноте строку `DATABASE_URL=` и допишите после `=` адрес базы.
+
+**Если Postgres установлен в систему** (вариант А из шага 2) —
+подставьте свой пароль вместо `ВАШ_ПАРОЛЬ`:
+
+```dotenv
+DATABASE_URL=postgresql://postgres:ВАШ_ПАРОЛЬ@localhost:5432/vk_rideshare?schema=public
+```
+
+**Если Postgres в Docker** (вариант Б) — логин и пароль уже известны,
+менять ничего не нужно:
 
 ```dotenv
 DATABASE_URL=postgresql://rideshare:rideshare@localhost:5432/vk_rideshare?schema=public
 ```
 
-Разбор по частям:
+Разбор по частям — на примере варианта с Docker:
 
 ```
 postgresql://  rideshare : rideshare @ localhost : 5432 / vk_rideshare ?schema=public
    протокол    польз-ль    пароль      хост        порт    база          схема
 ```
 
+Пробелов вокруг `=` быть не должно, кавычки не нужны.
+
 ### 3.2. `VK_APP_SECRET` — ключ, которым подписываются launch-параметры
 
 Для локальной разработки подойдёт **любая непустая строка** — она нужна
-только чтобы подписывать и проверять моковые параметры:
+только чтобы подписывать и проверять моковые параметры. **Строка в файл
+`.env`:**
 
 ```dotenv
 VK_APP_SECRET=local-dev-secret-change-me
@@ -416,7 +443,7 @@ node -e "console.log(require('node:crypto').randomBytes(24).toString('base64url'
 
 Без этой строки приложение откроется, но покажет «Не удалось подтвердить
 запуск»: браузер вне фрейма ВКонтакте не получает launch-параметров, и API
-честно отвечает `401`.
+честно отвечает `401`. **Строка в файл `.env`:**
 
 ```dotenv
 VK_MOCK_LAUNCH_PARAMS=vk_user_id=1000001&vk_app_id=51234567&vk_platform=desktop_web
@@ -438,6 +465,8 @@ VK_MOCK_LAUNCH_PARAMS=vk_user_id=1000001&vk_app_id=51234567&vk_platform=desktop_
 Вот файл целиком, который точно работает. `DATABASE_URL` здесь — для
 Postgres, установленного в систему (вариант А из шага 2); для Docker
 подставьте `rideshare:rideshare` вместо `postgres:ВАШ_ПАРОЛЬ`.
+
+**Это содержимое файла `.env` целиком — не вставляйте его в терминал:**
 
 ```dotenv
 POSTGRES_USER=
@@ -608,7 +637,8 @@ curl -s "http://localhost:3000/api/trips?limit=1" | head -c 120
 
 Три способа, от простого к гибкому.
 
-**1. Поменять `vk_user_id` в `.env`** и перезапустить API:
+**1. Поменять `vk_user_id` в `.env`** (строка в файле, не команда) и
+перезапустить API:
 
 ```dotenv
 VK_MOCK_LAUNCH_PARAMS=vk_user_id=1000004&vk_app_id=51234567&vk_platform=desktop_web
@@ -678,6 +708,7 @@ vk_access_token_settings=&vk_app_id=0&vk_are_notifications_enabled=0&...&sign=uc
 | Все поездки пропали из ленты через несколько дней | Лента показывает только будущие поездки | `npm run db:seed` пересчитает даты от «сейчас» |
 | `EADDRINUSE: address already in use :::3000` | Порт занят | `API_PORT=3001` в `.env` и `VITE_API_BASE_URL=http://localhost:3001/api` |
 | `Port 5173 is in use` | Порт занят | Vite сам возьмёт 5174 и напишет об этом; добавьте новый адрес в `CORS_ORIGIN` |
+| `"DATABASE_URL" не является внутренней или внешней командой` (или `VK_APP_SECRET: command not found`) | Строка из `.env` вставлена в терминал. Это содержимое файла, а не команда | Откройте файл — `notepad .env` — и впишите строку туда, затем сохраните Ctrl+S |
 | `fatal: could not create work tree dir 'Labs': Permission denied` при `git clone` | Терминал находится в каталоге, куда вам нельзя писать — обычно `C:\Windows\System32` (cmd «от имени администратора») или корень диска | Перейдите в свою папку и повторите: `cd /d %USERPROFILE%\projects` (cmd) или `cd ~/projects` (macOS, Linux). Администратором запускать не нужно |
 | `destination path 'Labs' already exists and is not an empty directory` | Папка от прошлой попытки клонирования | `cd Labs` и `git status`: показал ветку — репозиторий целый, продолжайте с `git checkout`; ответил `not a git repository` — удалите папку и клонируйте заново. Обе команды расписаны в шаге 1 |
 | `Cannot find module '@vk-rideshare/shared'` | Не собран общий пакет | `npm run build -w @vk-rideshare/shared` |
@@ -856,7 +887,7 @@ npm run test
 ## Фронтенд — на хостинг VK Mini Apps
 
 1. Задайте боевой адрес API **до** сборки: значение вшивается в бандл, а не
-   читается в рантайме.
+   читается в рантайме. Строка в файл `.env`:
 
    ```dotenv
    VITE_API_BASE_URL=https://api.вашдомен/api
