@@ -5,6 +5,9 @@ coverage/
 .vite/
 *.tsbuildinfo
 
+# Конфиг выкатки содержит ID конкретного приложения — у каждого свой
+apps/web/vk-hosting-config.json
+
 # Секреты — никогда в репозиторий
 .env
 .env.*

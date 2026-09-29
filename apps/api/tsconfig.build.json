@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Только src: иначе tsc раскладывает вывод по dist/src, dist/test,
+    // dist/scripts, и `node dist/server.js` не находит точку входа.
+    // Тесты и служебные скрипты в продакшен-сборку не нужны.
+    "rootDir": "./src",
+    "outDir": "./dist"
+  },
+  "include": ["src/**/*.ts"]
+}
