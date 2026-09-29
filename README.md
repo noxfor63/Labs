@@ -135,6 +135,65 @@ git checkout claude/vk-rideshare-mini-app-qqbdhb
 npm install
 ```
 
+### Если git ответил `destination path 'Labs' already exists`
+
+Значит, папка от прошлой попытки уже лежит рядом. Клонировать поверх неё
+git не станет — сначала выясните, целая она или испорченная.
+
+**cmd и PowerShell — одинаково:**
+
+```
+cd Labs
+git status
+```
+
+**Если `git status` показал ветку и состояние файлов** — репозиторий
+целый, клонировать заново не нужно. Продолжайте с того же места:
+
+```
+git fetch origin
+git checkout claude/vk-rideshare-mini-app-qqbdhb
+git pull
+npm install
+```
+
+**Если `git status` ответил `fatal: not a git repository`** — папка
+осталась от оборвавшегося клонирования, в ней мусор. Удалите её и
+склонируйте заново.
+
+**cmd:**
+
+```
+cd ..
+rmdir /s /q Labs
+git clone https://github.com/noxfor63/Labs.git
+cd Labs
+git checkout claude/vk-rideshare-mini-app-qqbdhb
+npm install
+```
+
+**PowerShell:**
+
+```
+cd ..
+Remove-Item Labs -Recurse -Force
+git clone https://github.com/noxfor63/Labs.git
+cd Labs
+git checkout claude/vk-rideshare-mini-app-qqbdhb
+npm install
+```
+
+**macOS и Linux:**
+
+```
+cd ..
+rm -rf Labs
+git clone https://github.com/noxfor63/Labs.git
+cd Labs
+git checkout claude/vk-rideshare-mini-app-qqbdhb
+npm install
+```
+
 > Запускать терминал от имени администратора для этого проекта не нужно —
 > ни для клонирования, ни для установки зависимостей, ни для запуска.
 
@@ -620,7 +679,7 @@ vk_access_token_settings=&vk_app_id=0&vk_are_notifications_enabled=0&...&sign=uc
 | `EADDRINUSE: address already in use :::3000` | Порт занят | `API_PORT=3001` в `.env` и `VITE_API_BASE_URL=http://localhost:3001/api` |
 | `Port 5173 is in use` | Порт занят | Vite сам возьмёт 5174 и напишет об этом; добавьте новый адрес в `CORS_ORIGIN` |
 | `fatal: could not create work tree dir 'Labs': Permission denied` при `git clone` | Терминал находится в каталоге, куда вам нельзя писать — обычно `C:\Windows\System32` (cmd «от имени администратора») или корень диска | Перейдите в свою папку и повторите: `cd /d %USERPROFILE%\projects` (cmd) или `cd ~/projects` (macOS, Linux). Администратором запускать не нужно |
-| `destination path 'Labs' already exists and is not an empty directory` | Папка от прошлой попытки | Зайдите в неё и продолжите с `git checkout`, либо удалите её и клонируйте заново |
+| `destination path 'Labs' already exists and is not an empty directory` | Папка от прошлой попытки клонирования | `cd Labs` и `git status`: показал ветку — репозиторий целый, продолжайте с `git checkout`; ответил `not a git repository` — удалите папку и клонируйте заново. Обе команды расписаны в шаге 1 |
 | `Cannot find module '@vk-rideshare/shared'` | Не собран общий пакет | `npm run build -w @vk-rideshare/shared` |
 | `Не удалось привести тестовую базу к схеме` при `npm run test` | Схема менялась несовместимо поверх старых тестовых данных | Удалите базу — тесты создадут её заново: `psql -U postgres -c "DROP DATABASE IF EXISTS vk_rideshare_test"` |
 | `npm run dev` запустил только один процесс | Порт 3000 или 5173 занят — второй процесс упал, и запускающий скрипт погасил оба | Посмотрите, что напечатано в терминале: там будет `EADDRINUSE` с номером порта. Освободите порт или смените его в `.env` |
