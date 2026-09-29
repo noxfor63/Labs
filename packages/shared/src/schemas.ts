@@ -89,6 +89,14 @@ export const tripSummarySchema = z.object({
   carModel: z.string().nullable(),
   comment: z.string().nullable(),
   status: tripStatusSchema,
+  /**
+   * Время выезда прошло, а поездку так и не закрыли.
+   *
+   * Считается сервером от текущего времени, а не хранится в базе:
+   * вычисляемое состояние не умеет рассинхронизироваться со временем,
+   * а хранимое — умеет, если фоновая уборка отстала или не сработала.
+   */
+  isExpired: z.boolean(),
   createdAt: z.string(),
   author: userPublicSchema,
 });

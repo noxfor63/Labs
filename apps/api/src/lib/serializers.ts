@@ -7,13 +7,14 @@
  */
 import type { Review, Trip, TripRequest, User } from '@prisma/client';
 
-import type {
-  MyRequestDto,
-  ReviewDto,
-  TripDetail,
-  TripRequestDto,
-  TripSummary,
-  UserPublic,
+import {
+  TRIP_STATUS,
+  type MyRequestDto,
+  type ReviewDto,
+  type TripDetail,
+  type TripRequestDto,
+  type TripSummary,
+  type UserPublic,
 } from '@vk-rideshare/shared';
 
 export function toUserPublic(user: User): UserPublic {
@@ -32,7 +33,18 @@ export type TripWithAuthor = Trip & { author: User };
 export type RequestWithUser = TripRequest & { user: User };
 export type ReviewWithPeople = Review & { author: User; target: User };
 
-export function toTripSummary(trip: TripWithAuthor): TripSummary {
+/**
+ * Поездка, у которой время выезда прошло, а статус так и остался ACTIVE.
+ *
+ * Состояние вычисляемое, а не хранимое: то же самое условие уже стоит в
+ * ленте и в проверке отклика, и лишняя копия в базе означала бы лишний
+ * источник расхождений.
+ */
+export function isTripExpired(trip: Trip, now: Date = new Date()): boolean {
+  return trip.status === TRIP_STATUS.ACTIVE && trip.departAt.getTime() <= now.getTime();
+}
+
+export function toTripSummary(trip: TripWithAuthor, now: Date = new Date()): TripSummary {
   return {
     id: trip.id,
     role: trip.role,
@@ -47,6 +59,7 @@ export function toTripSummary(trip: TripWithAuthor): TripSummary {
     carModel: trip.carModel,
     comment: trip.comment,
     status: trip.status,
+    isExpired: isTripExpired(trip, now),
     createdAt: trip.createdAt.toISOString(),
     author: toUserPublic(trip.author),
   };

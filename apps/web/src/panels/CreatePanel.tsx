@@ -2,6 +2,7 @@ import {
   CITIES,
   DEPART_TIME_SLOTS,
   LIMITS,
+  SEAT_OPTIONS,
   destinationsFrom,
   isAllowedDepartTime,
   isKnownRoute,
@@ -36,6 +37,18 @@ const allCityOptions = toOptions(CITIES);
 
 /** 48 получасовых слотов суток — время выезда выбирается только из них. */
 const timeOptions = DEPART_TIME_SLOTS.map((slot) => ({ value: slot, label: slot }));
+
+/**
+ * Места — выбор из списка, а не ввод числа.
+ *
+ * Свободный ввод здесь ничего не давал: допустимых значений всего шесть,
+ * зато он пускал в поле пустую строку, «3.5» и «e», а на телефоне
+ * поднимал цифровую клавиатуру поверх формы ради одного нажатия.
+ */
+const seatOptions = SEAT_OPTIONS.map((count) => ({
+  value: String(count),
+  label: String(count),
+}));
 
 type FieldErrors = Partial<Record<string, string>>;
 
@@ -228,7 +241,7 @@ export function CreatePanel({ id }: { id: string }): ReactNode {
         <FormItem top="Место сбора (необязательно)">
           <Input
             maxLength={LIMITS.POINT_MAX}
-            placeholder="Например, метро Тёплый Стан"
+            placeholder="Например, автовокзал"
             value={form.fromPoint}
             onChange={(event) => {
               update('fromPoint', event.target.value);
@@ -253,7 +266,7 @@ export function CreatePanel({ id }: { id: string }): ReactNode {
         <FormItem top="Место высадки (необязательно)">
           <Input
             maxLength={LIMITS.POINT_MAX}
-            placeholder="Например, автовокзал"
+            placeholder="Например, у центрального рынка"
             value={form.toPoint}
             onChange={(event) => {
               update('toPoint', event.target.value);
@@ -298,14 +311,11 @@ export function CreatePanel({ id }: { id: string }): ReactNode {
             status={errors['seatsTotal'] === undefined ? 'default' : 'error'}
             bottom={errors['seatsTotal']}
           >
-            <Input
-              type="number"
-              inputMode="numeric"
-              min={LIMITS.SEATS_MIN}
-              max={LIMITS.SEATS_MAX}
+            <CustomSelect
+              options={seatOptions}
               value={form.seatsTotal}
-              onChange={(event) => {
-                update('seatsTotal', event.target.value);
+              onChange={(_, value) => {
+                update('seatsTotal', value === null ? '' : String(value));
               }}
             />
           </FormItem>

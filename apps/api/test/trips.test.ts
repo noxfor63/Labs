@@ -2,8 +2,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
   AKBULAK,
+  LIMITS,
   ORENBURG,
   ROUTES,
+  SEAT_OPTIONS,
   SOL_ILETSK,
   nextDepartSlot,
 } from '@vk-rideshare/shared';
@@ -85,10 +87,19 @@ describe('POST /api/trips — создание и валидация', () => {
     expect(response.json().error.message).toMatch(/будущем/i);
   });
 
-  it('число мест вне диапазона 1..8 — 400', async () => {
-    for (const seatsTotal of [0, 9, 100]) {
+  it(`число мест вне диапазона ${LIMITS.SEATS_MIN}..${LIMITS.SEATS_MAX} — 400`, async () => {
+    // 7 и 8 здесь не случайны: раньше верхней границей было 8, и именно
+    // эти значения должны перестать проходить после её снижения до 6.
+    for (const seatsTotal of [0, 7, 8, 100, 2.5]) {
       const response = await create({ ...validPayload(), seatsTotal });
-      expect(response.statusCode).toBe(400);
+      expect(response.statusCode, `мест: ${seatsTotal}`).toBe(400);
+    }
+  });
+
+  it('все значения из SEAT_OPTIONS принимаются', async () => {
+    for (const seatsTotal of SEAT_OPTIONS) {
+      const response = await create({ ...validPayload(), seatsTotal });
+      expect(response.statusCode, `мест: ${seatsTotal}`).toBe(201);
     }
   });
 

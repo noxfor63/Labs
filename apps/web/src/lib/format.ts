@@ -15,9 +15,54 @@ const TIME_FORMAT = new Intl.DateTimeFormat('ru-RU', {
   minute: '2-digit',
 });
 
+const DAY_SHORT_FORMAT = new Intl.DateTimeFormat('ru-RU', {
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+});
+
 export const formatDate = (iso: string): string => DATE_FORMAT.format(new Date(iso));
 export const formatDateTime = (iso: string): string => DATE_TIME_FORMAT.format(new Date(iso));
 export const formatTime = (iso: string): string => TIME_FORMAT.format(new Date(iso));
+
+/** Полночь указанного дня по местному времени — не по UTC. */
+function startOfLocalDay(date: Date): number {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+}
+
+/**
+ * Разница в календарных днях по местному времени.
+ * 0 — сегодня, 1 — завтра, −1 — вчера.
+ */
+export function daysApart(iso: string, now: Date = new Date()): number {
+  const day = 24 * 60 * 60 * 1000;
+  return Math.round((startOfLocalDay(new Date(iso)) - startOfLocalDay(now)) / day);
+}
+
+/**
+ * Короткая подпись дня для карточки: «Сегодня», «Завтра», «сб, 4 окт.».
+ *
+ * Человек, глядящий на ленту, почти всегда ищет ближайшие сутки —
+ * и «Сегодня» он считывает быстрее, чем «4 октября».
+ */
+export function formatDayLabel(iso: string, now: Date = new Date()): string {
+  const diff = daysApart(iso, now);
+  if (diff === 0) {
+    return 'Сегодня';
+  }
+  if (diff === 1) {
+    return 'Завтра';
+  }
+  if (diff === -1) {
+    return 'Вчера';
+  }
+  return DAY_SHORT_FORMAT.format(new Date(iso));
+}
+
+/** «Сегодня в 09:30», «сб, 4 окт. в 09:30» — для заголовков и деталей. */
+export function formatDayAndTime(iso: string, now: Date = new Date()): string {
+  return `${formatDayLabel(iso, now)} в ${formatTime(iso)}`;
+}
 
 export function formatPrice(priceRub: number): string {
   return `${priceRub.toLocaleString('ru-RU')} ₽`;

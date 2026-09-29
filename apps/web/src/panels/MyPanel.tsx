@@ -19,6 +19,7 @@ import { ErrorState } from '../components/ErrorState.js';
 import { TripCard } from '../components/TripCard.js';
 import { TripCardSkeleton } from '../components/TripCardSkeleton.js';
 import { useAsync } from '../lib/useAsync.js';
+import { useNow } from '../lib/useNow.js';
 
 type TabId = 'trips' | 'requests' | 'completed';
 
@@ -34,6 +35,7 @@ const REQUEST_STATUS_LABEL: Record<string, string> = {
 export function MyPanel({ id, view }: { id: string; view: string }): ReactNode {
   const routeNavigator = useRouteNavigator();
   const { view: activeView } = useActiveVkuiLocation();
+  const now = useNow();
   const [tab, setTab] = useState<TabId>('trips');
   // Данные раздела нужны только когда раздел открыт.
   const enabled = activeView === view;
@@ -111,6 +113,7 @@ export function MyPanel({ id, view }: { id: string; view: string }): ReactNode {
             <TripCard
               key={trip.id}
               trip={trip}
+              now={now}
               onClick={() => {
                 void routeNavigator.push(`/my/trip/${trip.id}`);
               }}
@@ -135,6 +138,7 @@ export function MyPanel({ id, view }: { id: string; view: string }): ReactNode {
             <div key={request.id}>
               <TripCard
                 trip={request.trip}
+                now={now}
                 onClick={() => {
                   void routeNavigator.push(`/my/trip/${request.trip.id}`);
                 }}
@@ -162,6 +166,7 @@ export function MyPanel({ id, view }: { id: string; view: string }): ReactNode {
           <div key={trip.id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <TripCard
               trip={trip}
+              now={now}
               onClick={() => {
                 void routeNavigator.push(`/my/trip/${trip.id}`);
               }}

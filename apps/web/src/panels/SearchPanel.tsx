@@ -1,11 +1,4 @@
-import {
-  CITIES,
-  LIMITS,
-  destinationsFrom,
-  isKnownRoute,
-  type TripListQuery,
-  type TripRole,
-} from '@vk-rideshare/shared';
+import { LIMITS, ROUTES, SEAT_OPTIONS, type TripListQuery, type TripRole } from '@vk-rideshare/shared';
 import { Icon56SearchOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import {
@@ -26,76 +19,120 @@ import {
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { ErrorState } from '../components/ErrorState.js';
+import { FilterChips, type ChipOption } from '../components/FilterChips.js';
 import { TripCard } from '../components/TripCard.js';
 import { TripCardSkeleton } from '../components/TripCardSkeleton.js';
+import { toDateInputValue } from '../lib/format.js';
+import { useNow } from '../lib/useNow.js';
 import { useTripFeed } from '../lib/useTripFeed.js';
 
-const toOptions = (cities: readonly { name: string }[]) =>
-  cities.map((city) => ({ value: city.name, label: city.name }));
+/**
+ * Направление выбирается одной «таблеткой», а не парой списков.
+ *
+ * Маршрутов ровно шесть и набор закрыт, поэтому показать их все разом
+ * дешевле, чем заставлять выбирать «откуда», потом «куда» — и получать
+ * в награду за ошибку сообщение «такого направления нет».
+ */
+const ROUTE_CHIPS: readonly ChipOption<string>[] = [
+  { value: 'ANY', label: 'Все направления' },
+  ...ROUTES.map((route, index) => ({
+    value: String(index),
+    label: `${route.from} → ${route.to}`,
+  })),
+];
 
-const allCityOptions = toOptions(CITIES);
+type DayFilter = 'ANY' | 'TODAY' | 'TOMORROW' | 'CUSTOM';
+
+const DAY_CHIPS: readonly ChipOption<DayFilter>[] = [
+  { value: 'ANY', label: 'Любой день' },
+  { value: 'TODAY', label: 'Сегодня' },
+  { value: 'TOMORROW', label: 'Завтра' },
+  { value: 'CUSTOM', label: 'Выбрать дату' },
+];
+
+const ANY = 'ANY';
+
+/** Цена шагом в 50 ₽ — тем же, что и в форме создания. */
+const priceOptions = [
+  { value: ANY, label: 'Любая' },
+  ...Array.from(
+    { length: (LIMITS.PRICE_MAX - LIMITS.PRICE_MIN) / 50 + 1 },
+    (_, index) => LIMITS.PRICE_MIN + index * 50,
+  ).map((price) => ({ value: String(price), label: `до ${price} ₽` })),
+];
+
+const seatsOptions = [
+  { value: ANY, label: 'Любое' },
+  ...SEAT_OPTIONS.map((count) => ({ value: String(count), label: `от ${count}` })),
+];
 
 type RoleFilter = TripRole | 'ANY';
 
 export function SearchPanel({ id }: { id: string }): ReactNode {
   const routeNavigator = useRouteNavigator();
+  // Через useNow, а не Date.now() в рендере: «сегодня» обязано пережить полночь.
+  const now = useNow();
 
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const [date, setDate] = useState('');
+  const [routeKey, setRouteKey] = useState('ANY');
+  const [day, setDay] = useState<DayFilter>('ANY');
+  const [customDate, setCustomDate] = useState('');
   const [role, setRole] = useState<RoleFilter>('ANY');
-  const [priceMax, setPriceMax] = useState('');
-  const [seatsMin, setSeatsMin] = useState('');
+  const [priceMax, setPriceMax] = useState(ANY);
+  const [seatsMin, setSeatsMin] = useState(ANY);
+  const [showMore, setShowMore] = useState(false);
 
-  // Фильтры применяются кнопкой: дёргать API на каждое нажатие клавиши
-  // в поле цены — плохая идея и для сети, и для глаз.
-  const [applied, setApplied] = useState<TripListQuery>({});
+  const dates = useMemo(() => {
+    const today = new Date(now);
+    const tomorrow = new Date(now + 24 * 60 * 60 * 1000);
+    return { today: toDateInputValue(today), tomorrow: toDateInputValue(tomorrow) };
+  }, [now]);
 
-  const feed = useTripFeed(applied);
-
-  const draft = useMemo<TripListQuery>(() => {
+  /**
+   * Все фильтры дискретны, поэтому применяются сразу по нажатию —
+   * кнопка «Найти» не нужна. Свободного ввода, ради которого её раньше
+   * держали, в фильтрах не осталось: цена и места стали списками.
+   */
+  const query = useMemo<TripListQuery>(() => {
     const next: TripListQuery = {};
-    if (from !== '') {
-      next.from = from;
+
+    if (routeKey !== 'ANY') {
+      const route = ROUTES[Number(routeKey)];
+      if (route !== undefined) {
+        next.from = route.from;
+        next.to = route.to;
+      }
     }
-    if (to !== '') {
-      next.to = to;
+
+    if (day === 'TODAY') {
+      next.date = dates.today;
+    } else if (day === 'TOMORROW') {
+      next.date = dates.tomorrow;
+    } else if (day === 'CUSTOM' && customDate !== '') {
+      next.date = customDate;
     }
-    if (date !== '') {
-      next.date = date;
-    }
+
     if (role !== 'ANY') {
       next.role = role;
     }
-    const price = Number(priceMax);
-    if (
-      priceMax !== '' &&
-      Number.isFinite(price) &&
-      price >= LIMITS.PRICE_MIN &&
-      price <= LIMITS.PRICE_MAX
-    ) {
-      next.priceMax = price;
+    if (priceMax !== ANY) {
+      next.priceMax = Number(priceMax);
     }
-    const seats = Number(seatsMin);
-    if (seatsMin !== '' && Number.isFinite(seats) && seats >= 1) {
-      next.seatsMin = seats;
+    if (seatsMin !== ANY) {
+      next.seatsMin = Number(seatsMin);
     }
     return next;
-  }, [from, to, date, role, priceMax, seatsMin]);
+  }, [routeKey, day, customDate, dates, role, priceMax, seatsMin]);
 
-  const hasFilters = Object.keys(applied).length > 0;
+  const feed = useTripFeed(query);
+  const hasFilters = Object.keys(query).length > 0;
 
-  // Список направлений закрытый, поэтому «куда» показываем только то,
-  // куда из выбранного города действительно ездят.
-  const toOptionsForFrom =
-    from === '' ? allCityOptions : toOptions(destinationsFrom(from));
-
-  const pickFrom = (value: string): void => {
-    setFrom(value);
-    // Прошлое «куда» могло стать недостижимым — тогда сбрасываем его.
-    if (value !== '' && to !== '' && !isKnownRoute(value, to)) {
-      setTo('');
-    }
+  const reset = (): void => {
+    setRouteKey('ANY');
+    setDay('ANY');
+    setCustomDate('');
+    setRole('ANY');
+    setPriceMax(ANY);
+    setSeatsMin(ANY);
   };
 
   // Подгрузка по скроллу: наблюдаем за пустым блоком в конце списка.
@@ -120,35 +157,100 @@ export function SearchPanel({ id }: { id: string }): ReactNode {
     };
   }, [sentinel, hasMore, loadMore]);
 
+  const renderFeed = (): ReactNode => {
+    if (feed.error !== null && feed.items.length === 0) {
+      return <ErrorState error={feed.error} onRetry={feed.reload} />;
+    }
+    if (feed.isLoading) {
+      return (
+        <Div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <TripCardSkeleton />
+          <TripCardSkeleton />
+          <TripCardSkeleton />
+        </Div>
+      );
+    }
+    if (feed.items.length === 0) {
+      return (
+        <Placeholder
+          icon={<Icon56SearchOutline />}
+          title="Ничего не нашлось"
+          action={
+            hasFilters ? (
+              <Button size="m" mode="secondary" onClick={reset}>
+                Сбросить фильтры
+              </Button>
+            ) : (
+              <Button
+                size="m"
+                onClick={() => {
+                  void routeNavigator.push('/create');
+                }}
+              >
+                Создать поездку
+              </Button>
+            )
+          }
+        >
+          {hasFilters
+            ? 'По этим фильтрам поездок нет. Попробуйте другой день или направление.'
+            : 'Пока никто не опубликовал поездку. Будьте первым.'}
+        </Placeholder>
+      );
+    }
+
+    return (
+      <>
+        <Div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {feed.items.map((trip) => (
+            <TripCard
+              key={trip.id}
+              trip={trip}
+              now={now}
+              onClick={() => {
+                void routeNavigator.push(`/trip/${trip.id}`);
+              }}
+            />
+          ))}
+        </Div>
+
+        <div ref={setSentinel} />
+
+        {feed.isLoadingMore && (
+          <Div style={{ display: 'flex', justifyContent: 'center' }}>
+            <Spinner size="m" />
+          </Div>
+        )}
+      </>
+    );
+  };
+
   return (
     <Panel id={id}>
       <PanelHeader>Поиск попутчиков</PanelHeader>
 
-      <Group header={<Header size="s">Фильтры</Header>}>
-        <FormLayoutGroup mode="horizontal">
-          <FormItem top="Откуда">
-            <CustomSelect
-              placeholder="Любой город"
-              allowClearButton
-              options={allCityOptions}
-              value={from === '' ? null : from}
-              onChange={(_, value) => {
-                pickFrom(value === null ? '' : String(value));
+      <Group>
+        <Div style={{ paddingBottom: 0 }}>
+          <FilterChips
+            ariaLabel="Направление"
+            options={ROUTE_CHIPS}
+            value={routeKey}
+            onChange={setRouteKey}
+          />
+          <FilterChips ariaLabel="День поездки" options={DAY_CHIPS} value={day} onChange={setDay} />
+        </Div>
+
+        {day === 'CUSTOM' && (
+          <FormItem top="Дата">
+            <Input
+              type="date"
+              value={customDate}
+              onChange={(event) => {
+                setCustomDate(event.target.value);
               }}
             />
           </FormItem>
-          <FormItem top="Куда">
-            <CustomSelect
-              placeholder="Любой город"
-              allowClearButton
-              options={toOptionsForFrom}
-              value={to === '' ? null : to}
-              onChange={(_, value) => {
-                setTo(value === null ? '' : String(value));
-              }}
-            />
-          </FormItem>
-        </FormLayoutGroup>
+        )}
 
         <FormItem top="Кого ищете">
           <SegmentedControl
@@ -164,140 +266,48 @@ export function SearchPanel({ id }: { id: string }): ReactNode {
           />
         </FormItem>
 
-        <FormItem top="Дата">
-          <Input
-            type="date"
-            value={date}
-            onChange={(event) => {
-              setDate(event.target.value);
-            }}
-          />
-        </FormItem>
-
-        <FormLayoutGroup mode="horizontal">
-          <FormItem top="Цена до, ₽">
-            <Input
-              type="number"
-              inputMode="numeric"
-              min={LIMITS.PRICE_MIN}
-              max={LIMITS.PRICE_MAX}
-              step={50}
-              placeholder={`До ${LIMITS.PRICE_MAX}`}
-              value={priceMax}
-              onChange={(event) => {
-                setPriceMax(event.target.value);
-              }}
-            />
-          </FormItem>
-          <FormItem top="Мест от">
-            <Input
-              type="number"
-              inputMode="numeric"
-              min={LIMITS.SEATS_MIN}
-              max={LIMITS.SEATS_MAX}
-              placeholder="Любое"
-              value={seatsMin}
-              onChange={(event) => {
-                setSeatsMin(event.target.value);
-              }}
-            />
-          </FormItem>
-        </FormLayoutGroup>
+        {showMore && (
+          <FormLayoutGroup mode="horizontal">
+            <FormItem top="Цена">
+              <CustomSelect
+                options={priceOptions}
+                value={priceMax}
+                onChange={(_, value) => {
+                  setPriceMax(value === null ? ANY : String(value));
+                }}
+              />
+            </FormItem>
+            <FormItem top="Мест свободно">
+              <CustomSelect
+                options={seatsOptions}
+                value={seatsMin}
+                onChange={(_, value) => {
+                  setSeatsMin(value === null ? ANY : String(value));
+                }}
+              />
+            </FormItem>
+          </FormLayoutGroup>
+        )}
 
         <Div style={{ display: 'flex', gap: 8 }}>
           <Button
-            size="l"
-            stretched
+            size="m"
+            mode="tertiary"
             onClick={() => {
-              setApplied(draft);
+              setShowMore((value) => !value);
             }}
           >
-            Найти
+            {showMore ? 'Свернуть фильтры' : 'Ещё фильтры'}
           </Button>
           {hasFilters && (
-            <Button
-              size="l"
-              mode="secondary"
-              onClick={() => {
-                setFrom('');
-                setTo('');
-                setDate('');
-                setRole('ANY');
-                setPriceMax('');
-                setSeatsMin('');
-                setApplied({});
-              }}
-            >
+            <Button size="m" mode="tertiary" onClick={reset}>
               Сбросить
             </Button>
           )}
         </Div>
       </Group>
 
-      <Group header={<Header size="s">Поездки</Header>}>
-        {feed.error !== null && feed.items.length === 0 ? (
-          <ErrorState error={feed.error} onRetry={feed.reload} />
-        ) : feed.isLoading ? (
-          <Div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <TripCardSkeleton />
-            <TripCardSkeleton />
-            <TripCardSkeleton />
-          </Div>
-        ) : feed.items.length === 0 ? (
-          <Placeholder
-            icon={<Icon56SearchOutline />}
-            title="Ничего не нашлось"
-            action={
-              hasFilters ? (
-                <Button
-                  size="m"
-                  mode="secondary"
-                  onClick={() => {
-                    setApplied({});
-                  }}
-                >
-                  Сбросить фильтры
-                </Button>
-              ) : (
-                <Button
-                  size="m"
-                  onClick={() => {
-                    void routeNavigator.push('/create');
-                  }}
-                >
-                  Создать поездку
-                </Button>
-              )
-            }
-          >
-            {hasFilters
-              ? 'По этим фильтрам поездок нет. Попробуйте изменить дату или маршрут.'
-              : 'Пока никто не опубликовал поездку. Будьте первым.'}
-          </Placeholder>
-        ) : (
-          <>
-            <Div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {feed.items.map((trip) => (
-                <TripCard
-                  key={trip.id}
-                  trip={trip}
-                  onClick={() => {
-                    void routeNavigator.push(`/trip/${trip.id}`);
-                  }}
-                />
-              ))}
-            </Div>
-
-            <div ref={setSentinel} />
-
-            {feed.isLoadingMore && (
-              <Div style={{ display: 'flex', justifyContent: 'center' }}>
-                <Spinner size="m" />
-              </Div>
-            )}
-          </>
-        )}
-      </Group>
+      <Group header={<Header size="s">Поездки</Header>}>{renderFeed()}</Group>
     </Panel>
   );
 }

@@ -24,7 +24,8 @@ export const meRoutes = ({ prisma }: RouteDeps): FastifyPluginAsync => {
         orderBy: [{ departAt: 'desc' }],
         include: { author: true },
       });
-      return { items: trips.map(toTripSummary) };
+      const now = new Date();
+      return { items: trips.map((trip) => toTripSummary(trip, now)) };
     });
 
     /** Мои отклики — то, куда я попросился. */

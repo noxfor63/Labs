@@ -94,7 +94,7 @@ export const tripRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlugin
       const last = page.at(-1);
 
       return {
-        items: page.map(toTripSummary),
+        items: page.map((trip) => toTripSummary(trip, now)),
         nextCursor:
           hasMore && last !== undefined
             ? encodeCursor({ departAt: last.departAt, id: last.id })
