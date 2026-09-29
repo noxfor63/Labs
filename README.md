@@ -197,13 +197,17 @@ npm install
 > Запускать терминал от имени администратора для этого проекта не нужно —
 > ни для клонирования, ни для установки зависимостей, ни для запуска.
 
-`npm install` делает **три** вещи, а не одну:
+`npm install` делает **четыре** вещи, а не одну:
 
 1. ставит зависимости всех трёх пакетов монорепозитория сразу
    (npm workspaces — отдельно в `apps/api` и `apps/web` заходить не нужно);
 2. связывает `packages/shared` с обоими приложениями;
 3. собирает `packages/shared` в `packages/shared/dist` — это делает скрипт
-   `prepare`. Без него `apps/api` и `apps/web` не найдут общие типы.
+   `prepare`. Без него `apps/api` и `apps/web` не найдут общие типы;
+4. генерирует клиент Prisma из `schema.prisma` — скрипт `postinstall`.
+   Клиент собирается из схемы и в репозиторий не попадает, поэтому без
+   этого шага первый же запрос к базе падает с
+   `does not provide an export named 'PrismaClient'`.
 
 Занимает 40–90 секунд. Успешное завершение выглядит так:
 
@@ -233,6 +237,14 @@ ls packages/shared/dist
 
 ```
 npm run build -w @vk-rideshare/shared
+```
+
+Клиент Prisma проверяется так же — каталог `node_modules\.prisma\client`
+(в cmd) или `node_modules/.prisma/client` (в PowerShell) должен
+существовать. Если его нет:
+
+```
+npm run postinstall -w @vk-rideshare/api
 ```
 
 ---
@@ -730,6 +742,7 @@ vk_access_token_settings=&vk_app_id=0&vk_are_notifications_enabled=0&...&sign=uc
 | `"DATABASE_URL" не является внутренней или внешней командой` (или `VK_APP_SECRET: command not found`) | Строка из `.env` вставлена в терминал. Это содержимое файла, а не команда | Откройте файл — `notepad .env` — и впишите строку туда, затем сохраните Ctrl+S |
 | `fatal: could not create work tree dir 'Labs': Permission denied` при `git clone` | Терминал находится в каталоге, куда вам нельзя писать — обычно `C:\Windows\System32` (cmd «от имени администратора») или корень диска | Перейдите в свою папку и повторите: `cd /d %USERPROFILE%\projects` (cmd) или `cd ~/projects` (macOS, Linux). Администратором запускать не нужно |
 | `destination path 'Labs' already exists and is not an empty directory` | Папка от прошлой попытки клонирования | `cd Labs` и `git status`: показал ветку — репозиторий целый, продолжайте с `git checkout`; ответил `not a git repository` — удалите папку и клонируйте заново. Обе команды расписаны в шаге 1 |
+| `SyntaxError: The requested module '@prisma/client' does not provide an export named 'PrismaClient'` | Не сгенерирован клиент Prisma — он собирается из схемы и в репозиторий не попадает | `npm install` генерирует его сам (скрипт `postinstall`). Если папка `node_modules` осталась от старой версии проекта, выполните `npm install` ещё раз или напрямую `npm run postinstall -w @vk-rideshare/api` |
 | `Cannot find module '@vk-rideshare/shared'` | Не собран общий пакет | `npm run build -w @vk-rideshare/shared` |
 | `Не удалось привести тестовую базу к схеме` при `npm run test` | Схема менялась несовместимо поверх старых тестовых данных | Удалите базу — тесты создадут её заново: `psql -U postgres -c "DROP DATABASE IF EXISTS vk_rideshare_test"` |
 | `npm run dev` запустил только один процесс | Порт 3000 или 5173 занят — второй процесс упал, и запускающий скрипт погасил оба | Посмотрите, что напечатано в терминале: там будет `EADDRINUSE` с номером порта. Освободите порт или смените его в `.env` |
