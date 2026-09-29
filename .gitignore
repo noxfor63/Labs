@@ -19,3 +19,6 @@ apps/web/vk-hosting-config.json
 npm-debug.log*
 .idea/
 .vscode/
+
+# Архив сборки, который создаёт @vkontakte/vk-miniapps-deploy
+apps/web/build.zip
