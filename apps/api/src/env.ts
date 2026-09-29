@@ -31,6 +31,34 @@ function loadDotEnv(): void {
 
 loadDotEnv();
 
+/**
+ * Origin хостинга VK Mini Apps для конкретного приложения.
+ *
+ * Зачем шаблон вместо точного адреса: VK Hosting выдаёт новый поддомен на
+ * каждую боевую выкатку — `prod-app<ID>-60d108837c47…`, потом
+ * `prod-app<ID>-97016fdcb367…`. С фиксированным списком после каждой
+ * выкатки пришлось бы править .env на сервере и перезапускать службу, и
+ * однажды это забылось бы, а приложение молча перестало бы работать.
+ *
+ * Шаблон привязан к вашему VK_APP_ID, поэтому чужие мини-приложения под
+ * него не подходят: у них другой id в имени хоста.
+ *
+ * Якоря ^ и $ здесь не украшение. Без них подошёл бы и
+ * `https://prod-app<ID>-abc.pages-ac.vk-apps.ru.злойдомен.рф`, и
+ * `http://…` без шифрования.
+ *
+ * Если ВКонтакте начнёт отдавать хостинг на другом домене, шаблон его не
+ * покроет — тогда адрес добавляется в CORS_ORIGIN руками, как раньше.
+ */
+export function buildVkHostingOrigin(appId: number | undefined): RegExp | null {
+  if (appId === undefined) {
+    return null;
+  }
+  return new RegExp(
+    `^https://(?:prod|stage|dev)-app${appId}-[0-9a-f]{6,32}\\.pages(?:-ac)?\\.vk-apps\\.ru$`,
+  );
+}
+
 const envSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -55,6 +83,8 @@ const envSchema = z
       corsOrigins: raw.CORS_ORIGIN.split(',')
         .map((origin) => origin.trim())
         .filter((origin) => origin !== ''),
+      /** Шаблон адресов хостинга VK для этого приложения; null — VK_APP_ID не задан. */
+      vkHostingOrigin: buildVkHostingOrigin(raw.VK_APP_ID),
       /**
        * Моковые launch-параметры доступны только вне продакшена.
        * Это и есть выключатель, который проверяет тест: в production

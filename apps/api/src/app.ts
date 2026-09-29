@@ -44,9 +44,21 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
         : false,
   });
 
+  /**
+   * Точные адреса из CORS_ORIGIN плюс шаблон хостинга VK, если задан
+   * VK_APP_ID. @fastify/cors разбирает массив поэлементно и умеет
+   * сравнивать и со строкой, и с регуляркой (см. isRequestOriginAllowed
+   * в его исходниках), поэтому колбэк здесь не нужен.
+   *
+   * Пустой список остаётся запретом: origin: false — ни одного заголовка.
+   */
+  const allowedOrigins: (string | RegExp)[] = [
+    ...env.corsOrigins,
+    ...(env.vkHostingOrigin === null ? [] : [env.vkHostingOrigin]),
+  ];
+
   await fastify.register(cors, {
-    // Только домен приложения: мини-апп грузится с известного origin.
-    origin: env.corsOrigins.length > 0 ? env.corsOrigins : false,
+    origin: allowedOrigins.length > 0 ? allowedOrigins : false,
     methods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'X-Launch-Params'],
     maxAge: 600,
