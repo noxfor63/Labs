@@ -23,7 +23,8 @@
     "db:push": "npm run db:push -w @vk-rideshare/api",
     "db:migrate": "npm run db:migrate -w @vk-rideshare/api",
     "db:seed": "npm run db:seed -w @vk-rideshare/api",
-    "db:studio": "npm run db:studio -w @vk-rideshare/api"
+    "db:studio": "npm run db:studio -w @vk-rideshare/api",
+    "db:url": "npm run db:url -w @vk-rideshare/api --"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
