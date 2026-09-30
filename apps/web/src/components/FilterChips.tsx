@@ -7,11 +7,10 @@ export type ChipOption<T extends string> = {
 };
 
 /**
- * Строка фильтров-«таблеток» с горизонтальной прокруткой.
+ * Строка фильтров-«таблеток».
  *
- * Направлений в приложении всего шесть, и выпадающий список под такой
- * замкнутый набор — лишний шаг: два касания вместо одного и невозможность
- * увидеть все варианты разом.
+ * Переносится на новую строку, а не прокручивается вбок: прокрутку надо
+ * заметить, а варианты за краем экрана обычно просто не находят.
  *
  * Пара токенов accent_themed + text_contrast_themed выбрана не случайно:
  * в тёмной теме они меняются местами (белый фон, чёрный текст), поэтому
@@ -34,13 +33,8 @@ export function FilterChips<T extends string>({
       aria-label={ariaLabel}
       style={{
         display: 'flex',
-        gap: 8,
-        overflowX: 'auto',
-        // Прокрутка должна доходить до края экрана, а содержимое —
-        // начинаться по общей сетке отступов.
-        padding: '4px 16px 8px',
-        margin: '0 -16px',
-        scrollbarWidth: 'none',
+        flexWrap: 'wrap',
+        gap: 6,
       }}
     >
       {options.map((option) => {
@@ -57,8 +51,8 @@ export function FilterChips<T extends string>({
               flex: '0 0 auto',
               border: 'none',
               cursor: 'pointer',
-              padding: '7px 12px',
-              borderRadius: 10,
+              padding: '6px 11px',
+              borderRadius: 9,
               background: selected
                 ? 'var(--vkui--color_background_accent_themed)'
                 : 'var(--vkui--color_background_secondary)',

@@ -24,6 +24,7 @@ export function toUserPublic(user: User): UserPublic {
     lastName: user.lastName,
     photoUrl: user.photoUrl,
     city: user.city,
+    phone: user.phone,
     ratingAvg: user.ratingAvg,
     ratingCount: user.ratingCount,
   };

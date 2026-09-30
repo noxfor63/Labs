@@ -1,8 +1,17 @@
-import { LIMITS, ROUTES, SEAT_OPTIONS, type TripListQuery, type TripRole } from '@vk-rideshare/shared';
+import {
+  CITIES,
+  LIMITS,
+  SEAT_OPTIONS,
+  destinationsFrom,
+  isKnownRoute,
+  type TripListQuery,
+  type TripRole,
+} from '@vk-rideshare/shared';
 import { Icon56SearchOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import {
   Button,
+  Caption,
   CustomSelect,
   Div,
   FormItem,
@@ -26,19 +35,23 @@ import { toDateInputValue } from '../lib/format.js';
 import { useNow } from '../lib/useNow.js';
 import { useTripFeed } from '../lib/useTripFeed.js';
 
+const ANY = 'ANY';
+
 /**
- * Направление выбирается одной «таблеткой», а не парой списков.
+ * Направление — два коротких ряда «откуда» и «куда», а не шесть длинных
+ * «таблеток» с полными названиями маршрутов.
  *
- * Маршрутов ровно шесть и набор закрыт, поэтому показать их все разом
- * дешевле, чем заставлять выбирать «откуда», потом «куда» — и получать
- * в награду за ошибку сообщение «такого направления нет».
+ * Шесть подписей вида «Оренбург → Соль-Илецк» не помещались на экран
+ * телефона и уезжали в горизонтальную прокрутку. Названий городов всего
+ * три, поэтому в разбивке по «откуда» и «куда» тот же выбор занимает две
+ * строки и виден целиком.
+ *
+ * Второй ряд показывается только после выбора города и содержит лишь
+ * достижимые из него направления — невозможный маршрут нельзя и собрать.
  */
-const ROUTE_CHIPS: readonly ChipOption<string>[] = [
-  { value: 'ANY', label: 'Все направления' },
-  ...ROUTES.map((route, index) => ({
-    value: String(index),
-    label: `${route.from} → ${route.to}`,
-  })),
+const CITY_CHIPS: readonly ChipOption<string>[] = [
+  { value: ANY, label: 'Все' },
+  ...CITIES.map((city) => ({ value: city.name, label: city.name })),
 ];
 
 type DayFilter = 'ANY' | 'TODAY' | 'TOMORROW' | 'CUSTOM';
@@ -49,8 +62,6 @@ const DAY_CHIPS: readonly ChipOption<DayFilter>[] = [
   { value: 'TOMORROW', label: 'Завтра' },
   { value: 'CUSTOM', label: 'Выбрать дату' },
 ];
-
-const ANY = 'ANY';
 
 /** Цена шагом в 50 ₽ — тем же, что и в форме создания. */
 const priceOptions = [
@@ -68,12 +79,19 @@ const seatsOptions = [
 
 type RoleFilter = TripRole | 'ANY';
 
+const CHIPS_LABEL_STYLE = {
+  display: 'block',
+  marginBottom: 6,
+  color: 'var(--vkui--color_text_secondary)',
+} as const;
+
 export function SearchPanel({ id }: { id: string }): ReactNode {
   const routeNavigator = useRouteNavigator();
   // Через useNow, а не Date.now() в рендере: «сегодня» обязано пережить полночь.
   const now = useNow();
 
-  const [routeKey, setRouteKey] = useState('ANY');
+  const [from, setFrom] = useState(ANY);
+  const [to, setTo] = useState(ANY);
   const [day, setDay] = useState<DayFilter>('ANY');
   const [customDate, setCustomDate] = useState('');
   const [role, setRole] = useState<RoleFilter>('ANY');
@@ -95,12 +113,11 @@ export function SearchPanel({ id }: { id: string }): ReactNode {
   const query = useMemo<TripListQuery>(() => {
     const next: TripListQuery = {};
 
-    if (routeKey !== 'ANY') {
-      const route = ROUTES[Number(routeKey)];
-      if (route !== undefined) {
-        next.from = route.from;
-        next.to = route.to;
-      }
+    if (from !== ANY) {
+      next.from = from;
+    }
+    if (to !== ANY) {
+      next.to = to;
     }
 
     if (day === 'TODAY') {
@@ -121,13 +138,31 @@ export function SearchPanel({ id }: { id: string }): ReactNode {
       next.seatsMin = Number(seatsMin);
     }
     return next;
-  }, [routeKey, day, customDate, dates, role, priceMax, seatsMin]);
+  }, [from, to, day, customDate, dates, role, priceMax, seatsMin]);
 
   const feed = useTripFeed(query);
   const hasFilters = Object.keys(query).length > 0;
 
+  /** Во втором ряду — только города, куда из выбранного действительно ездят. */
+  const toChips: ChipOption<string>[] =
+    from === ANY
+      ? [...CITY_CHIPS]
+      : [
+          { value: ANY, label: 'Все' },
+          ...destinationsFrom(from).map((city) => ({ value: city.name, label: city.name })),
+        ];
+
+  const pickFrom = (value: string): void => {
+    setFrom(value);
+    // Прошлое «куда» могло стать недостижимым — тогда сбрасываем его.
+    if (value !== ANY && to !== ANY && !isKnownRoute(value, to)) {
+      setTo(ANY);
+    }
+  };
+
   const reset = (): void => {
-    setRouteKey('ANY');
+    setFrom(ANY);
+    setTo(ANY);
     setDay('ANY');
     setCustomDate('');
     setRole('ANY');
@@ -231,12 +266,33 @@ export function SearchPanel({ id }: { id: string }): ReactNode {
 
       <Group>
         <Div style={{ paddingBottom: 0 }}>
+          <Caption level="1" style={CHIPS_LABEL_STYLE}>
+            Откуда
+          </Caption>
           <FilterChips
-            ariaLabel="Направление"
-            options={ROUTE_CHIPS}
-            value={routeKey}
-            onChange={setRouteKey}
+            ariaLabel="Город отправления"
+            options={CITY_CHIPS}
+            value={from}
+            onChange={pickFrom}
           />
+
+          {from !== ANY && (
+            <>
+              <Caption level="1" style={{ ...CHIPS_LABEL_STYLE, marginTop: 12 }}>
+                Куда
+              </Caption>
+              <FilterChips
+                ariaLabel="Город назначения"
+                options={toChips}
+                value={to}
+                onChange={setTo}
+              />
+            </>
+          )}
+
+          <Caption level="1" style={{ ...CHIPS_LABEL_STYLE, marginTop: 12 }}>
+            Когда
+          </Caption>
           <FilterChips ariaLabel="День поездки" options={DAY_CHIPS} value={day} onChange={setDay} />
         </Div>
 

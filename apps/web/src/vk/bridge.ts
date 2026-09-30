@@ -5,6 +5,8 @@
  * подтверждены типами пакета @vkontakte/vk-bridge:
  *   • VKWebAppInit
  *   • VKWebAppGetUserInfo → UserInfo
+ *   • VKWebAppGetPhoneNumber → { phone_number, sign, is_verified }
+ *   • VKWebAppGetPersonalCard → PersonalCardData { phone?, email?, address? }
  *   • событие VKWebAppUpdateConfig → ParentConfigData { appearance, scheme }
  *
  * Метода «открыть диалог с пользователем» в пакете нет, поэтому кнопка
@@ -79,6 +81,42 @@ export async function fetchVkProfile(): Promise<VkProfile | null> {
     photoUrl: info.photo_200 !== '' ? info.photo_200 : null,
     city: info.city?.title ?? null,
   };
+}
+
+/**
+ * Номер телефона из профиля ВКонтакте.
+ *
+ * Пробуем два подтверждённых метода по очереди:
+ *
+ * 1. VKWebAppGetPhoneNumber — отдаёт номер сразу, но доступен не каждому
+ *    приложению: это расширенное право, которое выдаётся модерацией.
+ *    Проверить условия выдачи из моего окружения я не могу, поэтому код
+ *    не рассчитывает на успех.
+ * 2. VKWebAppGetPersonalCard с type: ['phone'] — штатная карточка
+ *    контактов: пользователь сам подтверждает выдачу во всплывающем окне.
+ *
+ * Оба возвращают номер в своём формате, поэтому вызывающий код обязан
+ * прогнать результат через normalizePhone.
+ *
+ * null — не получилось; тогда пользователь вводит номер руками, и это
+ * нормальный путь, а не ошибка.
+ */
+export async function fetchVkPhone(): Promise<string | null> {
+  if (!isInsideVk()) {
+    return null;
+  }
+
+  const direct = await withTimeout(bridge.send('VKWebAppGetPhoneNumber'));
+  if (direct !== null && direct.phone_number !== '') {
+    return direct.phone_number;
+  }
+
+  const card = await withTimeout(bridge.send('VKWebAppGetPersonalCard', { type: ['phone'] }));
+  if (card !== null && typeof card.phone === 'string' && card.phone !== '') {
+    return card.phone;
+  }
+
+  return null;
 }
 
 function toColorScheme(appearance: ParentConfigData['appearance']): ColorSchemeType {

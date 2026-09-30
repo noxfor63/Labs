@@ -62,6 +62,8 @@ export const LIMITS = {
   RATING_MIN: 1,
   RATING_MAX: 5,
   POINT_MAX: 120,
+  /** Длина поля ввода номера: «+7 (999) 123-45-67» со скобками и пробелами. */
+  PHONE_MAX: 20,
   CAR_MODEL_MAX: 80,
   COMMENT_MAX: 1_000,
   REQUEST_MESSAGE_MAX: 500,

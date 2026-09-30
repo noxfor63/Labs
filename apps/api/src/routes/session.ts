@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 
-import type { SessionResponse } from '@vk-rideshare/shared';
+import { phoneInputSchema, type SessionResponse } from '@vk-rideshare/shared';
 
 import { parseWith } from '../lib/validate.js';
 import { toUserPublic } from '../lib/serializers.js';
@@ -20,6 +20,11 @@ const sessionBodySchema = z.object({
   lastName: z.string().trim().max(100).optional(),
   photoUrl: z.string().trim().max(500).nullish(),
   city: z.string().trim().max(100).nullish(),
+  /**
+   * Номер для связи. Приводится к +7XXXXXXXXXX здесь же: доверять
+   * нормализации на клиенте нельзя — запрос можно отправить и мимо него.
+   */
+  phone: phoneInputSchema.optional(),
 });
 
 export const sessionRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPluginAsync => {
@@ -38,6 +43,7 @@ export const sessionRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlu
           lastName?: string;
           photoUrl?: string | null;
           city?: string | null;
+          phone?: string | null;
         } = {};
         if (body.firstName !== undefined) {
           update.firstName = body.firstName;
@@ -51,6 +57,9 @@ export const sessionRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlu
         if (body.city !== undefined) {
           update.city = body.city ?? null;
         }
+        if (body.phone !== undefined) {
+          update.phone = body.phone;
+        }
 
         const user = await prisma.user.upsert({
           where: { vkUserId },
@@ -60,6 +69,7 @@ export const sessionRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlu
             lastName: body.lastName ?? '',
             photoUrl: body.photoUrl ?? null,
             city: body.city ?? null,
+            phone: body.phone ?? null,
           },
           update,
         });

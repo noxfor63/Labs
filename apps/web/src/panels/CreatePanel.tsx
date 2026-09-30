@@ -4,8 +4,10 @@ import {
   LIMITS,
   SEAT_OPTIONS,
   destinationsFrom,
+  formatPhone,
   isAllowedDepartTime,
   isKnownRoute,
+  normalizePhone,
   type CreateTripInput,
   type TripRole,
 } from '@vk-rideshare/shared';
@@ -27,7 +29,9 @@ import {
 import { useState, type ReactNode } from 'react';
 
 import { ApiRequestError, api } from '../api/client.js';
+import { PhoneField } from '../components/PhoneField.js';
 import { toDateInputValue } from '../lib/format.js';
+import { useSession } from '../lib/SessionContext.js';
 import { useSnackbar } from '../lib/SnackbarContext.js';
 
 const toOptions = (cities: readonly { name: string }[]) =>
@@ -64,9 +68,14 @@ type FormState = {
   priceRub: string;
   carModel: string;
   comment: string;
+  phone: string;
 };
 
-const emptyForm = (): FormState => ({
+/**
+ * Номер подставляется из профиля: он один на человека, и перенабирать его
+ * при каждом объявлении незачем. Правка здесь меняет его и в профиле.
+ */
+const emptyForm = (phone: string): FormState => ({
   role: 'DRIVER',
   fromCity: '',
   fromPoint: '',
@@ -78,6 +87,7 @@ const emptyForm = (): FormState => ({
   priceRub: '600',
   carModel: '',
   comment: '',
+  phone,
 });
 
 /** Локальная проверка — чтобы не гонять заведомо плохую форму на сервер. */
@@ -121,6 +131,10 @@ function validate(form: FormState): { errors: FieldErrors; departAt: Date | null
     errors['seatsTotal'] = `От ${LIMITS.SEATS_MIN} до ${LIMITS.SEATS_MAX}`;
   }
 
+  if (form.phone.trim() !== '' && normalizePhone(form.phone) === null) {
+    errors['phone'] = 'Укажите мобильный номер в виде +7 999 123-45-67';
+  }
+
   const price = Number(form.priceRub);
   if (form.priceRub === '') {
     errors['priceRub'] = 'Укажите цену';
@@ -138,8 +152,12 @@ function validate(form: FormState): { errors: FieldErrors; departAt: Date | null
 export function CreatePanel({ id }: { id: string }): ReactNode {
   const routeNavigator = useRouteNavigator();
   const snackbar = useSnackbar();
+  const session = useSession();
+  const profilePhone = session.user?.phone ?? '';
 
-  const [form, setForm] = useState<FormState>(emptyForm);
+  // Формат для показа, не для хранения: в поле удобнее видеть
+  // «+7 999 123-45-67», а на сервер всё равно уедет нормализованный вид.
+  const [form, setForm] = useState<FormState>(() => emptyForm(formatPhone(profilePhone)));
   const [errors, setErrors] = useState<FieldErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -175,11 +193,18 @@ export function CreatePanel({ id }: { id: string }): ReactNode {
       comment: form.comment.trim() === '' ? null : form.comment.trim(),
     };
 
+    const phone = form.phone.trim() === '' ? null : normalizePhone(form.phone);
+
     setIsSubmitting(true);
     try {
+      // Номер сохраняем до создания поездки: если объявление уедет, а
+      // номер нет, попутчики увидят поездку без способа дозвониться.
+      if (phone !== (session.user?.phone ?? null)) {
+        await session.savePhone(phone);
+      }
       const trip = await api.createTrip(input);
       snackbar.showSuccess('Поездка опубликована');
-      setForm(emptyForm());
+      setForm(emptyForm(phone === null ? '' : formatPhone(phone)));
       await routeNavigator.push(`/trip/${trip.id}`);
     } catch (caught) {
       snackbar.showError(
@@ -362,6 +387,14 @@ export function CreatePanel({ id }: { id: string }): ReactNode {
             }}
           />
         </FormItem>
+
+        <PhoneField
+          value={form.phone}
+          error={errors['phone']}
+          onChange={(value) => {
+            update('phone', value);
+          }}
+        />
 
         <Div>
           <Button

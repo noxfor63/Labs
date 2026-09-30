@@ -36,11 +36,40 @@ import { TripPanel } from './panels/TripPanel.js';
 import { UserPanel } from './panels/UserPanel.js';
 import { MODAL, PANEL, VIEW } from './routes.js';
 
+/**
+ * Иконки нижней панели на 24 вместо штатных 28.
+ *
+ * Панель — фон, а не содержание: крупные иконки с плотной тенью тянули
+ * взгляд вниз и спорили с карточками. Уменьшенные иконки, отсутствие тени
+ * (plain) и волосяная линия сверху возвращают ей роль разделителя.
+ */
+const TAB_ICON_SIZE = 24;
+
 const TABS = [
-  { view: VIEW.SEARCH, path: '/', label: 'Поиск', icon: <Icon28SearchOutline /> },
-  { view: VIEW.CREATE, path: '/create', label: 'Создать', icon: <Icon28AddCircleOutline /> },
-  { view: VIEW.MY, path: '/my', label: 'Мои', icon: <Icon28ListOutline /> },
-  { view: VIEW.PROFILE, path: '/profile', label: 'Профиль', icon: <Icon28UserCircleOutline /> },
+  {
+    view: VIEW.SEARCH,
+    path: '/',
+    label: 'Поиск',
+    icon: <Icon28SearchOutline width={TAB_ICON_SIZE} height={TAB_ICON_SIZE} />,
+  },
+  {
+    view: VIEW.CREATE,
+    path: '/create',
+    label: 'Создать',
+    icon: <Icon28AddCircleOutline width={TAB_ICON_SIZE} height={TAB_ICON_SIZE} />,
+  },
+  {
+    view: VIEW.MY,
+    path: '/my',
+    label: 'Мои',
+    icon: <Icon28ListOutline width={TAB_ICON_SIZE} height={TAB_ICON_SIZE} />,
+  },
+  {
+    view: VIEW.PROFILE,
+    path: '/profile',
+    label: 'Профиль',
+    icon: <Icon28UserCircleOutline width={TAB_ICON_SIZE} height={TAB_ICON_SIZE} />,
+  },
 ] as const;
 
 export function App(): ReactNode {
@@ -108,7 +137,13 @@ export function App(): ReactNode {
         <Epic
           activeStory={activeView}
           tabbar={
-            <Tabbar>
+            <Tabbar
+              plain
+              style={{
+                borderTop: '1px solid var(--vkui--color_separator_primary)',
+                background: 'var(--vkui--color_background_content)',
+              }}
+            >
               {TABS.map((tab) => (
                 <TabbarItem
                   key={tab.view}

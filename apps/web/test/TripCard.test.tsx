@@ -29,6 +29,7 @@ const trip = (overrides: Partial<TripSummary> = {}): TripSummary => ({
     lastName: 'Ковалёва',
     photoUrl: null,
     city: 'Оренбург',
+    phone: null,
     ratingAvg: 4.6,
     ratingCount: 11,
   },

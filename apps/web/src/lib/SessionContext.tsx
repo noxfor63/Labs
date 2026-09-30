@@ -1,5 +1,12 @@
 import type { UserPublic } from '@vk-rideshare/shared';
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from 'react';
 
 import { ApiRequestError, api } from '../api/client.js';
 import { fetchVkProfile } from '../vk/bridge.js';
@@ -9,6 +16,11 @@ export type SessionState = {
   isLoading: boolean;
   error: ApiRequestError | null;
   reload: () => void;
+  /**
+   * Сохраняет номер телефона в профиль и обновляет состояние.
+   * Бросает ApiRequestError — вызывающий показывает сообщение сам.
+   */
+  savePhone: (phone: string | null) => Promise<void>;
 };
 
 const SessionContext = createContext<SessionState>({
@@ -16,12 +28,13 @@ const SessionContext = createContext<SessionState>({
   isLoading: true,
   error: null,
   reload: () => undefined,
+  savePhone: () => Promise.resolve(),
 });
 
 export const useSession = (): SessionState => useContext(SessionContext);
 
 export function SessionProvider({ children }: { children: ReactNode }): ReactNode {
-  const [state, setState] = useState<Omit<SessionState, 'reload'>>({
+  const [state, setState] = useState<Omit<SessionState, 'reload' | 'savePhone'>>({
     user: null,
     isLoading: true,
     error: null,
@@ -71,10 +84,16 @@ export function SessionProvider({ children }: { children: ReactNode }): ReactNod
     };
   }, [attempt]);
 
+  const savePhone = useCallback(async (phone: string | null): Promise<void> => {
+    const response = await api.session({ phone });
+    setState((previous) => ({ ...previous, user: response.user }));
+  }, []);
+
   return (
     <SessionContext.Provider
       value={{
         ...state,
+        savePhone,
         reload: () => {
           setAttempt((value) => value + 1);
         },

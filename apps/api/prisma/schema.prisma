@@ -42,6 +42,8 @@ model User {
   lastName    String
   photoUrl    String?
   city        String?
+  /// Мобильный в виде +7XXXXXXXXXX. Показывается как способ связи; не указан — кнопки «Позвонить» нет.
+  phone       String?
   /// Средняя оценка по полученным отзывам; пересчитывается в транзакции отзыва.
   ratingAvg   Float    @default(0)
   ratingCount Int      @default(0)

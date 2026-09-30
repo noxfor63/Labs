@@ -15,7 +15,7 @@ const ALLOWED_ORIGIN = 'https://app.example';
 const hosting = (
   environment: string,
   appId: string = TEST_APP_ID,
-  hash = '97016fdcb367',
+  hash = '0a1b2c3d4e5f',
   domain = 'pages-ac',
 ): string => `https://${environment}-app${appId}-${hash}.${domain}.vk-apps.ru`;
 
@@ -49,14 +49,14 @@ describe('CORS: разрешённые адреса', () => {
   });
 
   it('боевой хостинг VK с любым хэшем', async () => {
-    for (const hash of ['97016fdcb367', '60d108837c47', 'abcdef']) {
+    for (const hash of ['0a1b2c3d4e5f', 'a1b2c3d4e5f6', 'abcdef']) {
       const origin = hosting('prod', TEST_APP_ID, hash);
       expect(await allowOriginHeader(origin), origin).toBe(origin);
     }
   });
 
   it('тестовый хостинг VK — домен pages, а не pages-ac', async () => {
-    const origin = hosting('stage', TEST_APP_ID, 'f555a4e50de1', 'pages');
+    const origin = hosting('stage', TEST_APP_ID, 'fedcba987654', 'pages');
     expect(await allowOriginHeader(origin)).toBe(origin);
   });
 });

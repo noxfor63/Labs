@@ -29,6 +29,7 @@ import {
 import { useCallback, useState, type ReactNode } from 'react';
 
 import { ApiRequestError, api } from '../api/client.js';
+import { ContactButtons } from '../components/ContactButtons.js';
 import { ErrorState } from '../components/ErrorState.js';
 import { RatingBadge } from '../components/RatingBadge.js';
 import {
@@ -41,7 +42,6 @@ import { useAsync } from '../lib/useAsync.js';
 import { useNow } from '../lib/useNow.js';
 import { useSnackbar } from '../lib/SnackbarContext.js';
 import { sectionPrefix } from '../routes.js';
-import { buildProfileUrl } from '../vk/bridge.js';
 
 const REQUEST_STATUS_LABEL: Record<string, string> = {
   PENDING: 'Ждёт ответа',
@@ -237,24 +237,7 @@ export function TripPanel({ id, view }: { id: string; view: string }): ReactNode
           {fullName(trip.author)}
         </SimpleCell>
 
-        {!trip.isAuthor && (
-          <Div>
-            {/*
-              Подтверждённого метода VK Bridge для открытия диалога нет,
-              поэтому ведём на профиль — диалог открывается оттуда.
-            */}
-            <Button
-              size="l"
-              mode="secondary"
-              stretched
-              href={buildProfileUrl(trip.author.vkUserId)}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Написать во ВКонтакте
-            </Button>
-          </Div>
-        )}
+        {!trip.isAuthor && <ContactButtons user={trip.author} />}
       </Group>
 
       {trip.isAuthor ? (
@@ -262,6 +245,9 @@ export function TripPanel({ id, view }: { id: string; view: string }): ReactNode
           {trip.requests.length === 0 ? (
             <Footer>Пока никто не откликнулся</Footer>
           ) : (
+            /* Нажатие по строке открывает карточку человека — там профиль
+               ВКонтакте и звонок. Дублировать кнопки в списке незачем:
+               на узком экране они вытесняют «Принять» и «Отклонить». */
             trip.requests.map((request) => (
               <SimpleCell
                 key={request.id}

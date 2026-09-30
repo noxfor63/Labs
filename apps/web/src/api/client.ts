@@ -133,6 +133,8 @@ export const api = {
     lastName?: string;
     photoUrl?: string | null;
     city?: string | null;
+    /** Номер в любом виде — бэкенд сам приведёт к +7XXXXXXXXXX. */
+    phone?: string | null;
   }): Promise<SessionResponse> => request('/session', { method: 'POST', body: profile }),
 
   listTrips: (query: TripListQuery, signal?: AbortSignal): Promise<TripListResponse> =>

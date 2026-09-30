@@ -5,8 +5,6 @@ import {
 } from '@vkontakte/vk-mini-apps-router';
 import {
   Avatar,
-  Button,
-  Div,
   Group,
   Panel,
   PanelHeader,
@@ -18,11 +16,11 @@ import {
 import { useCallback, type ReactNode } from 'react';
 
 import { api } from '../api/client.js';
+import { ContactButtons } from '../components/ContactButtons.js';
 import { ErrorState } from '../components/ErrorState.js';
 import { UserProfileBody } from '../components/UserProfileBody.js';
 import { fullName } from '../lib/format.js';
 import { useAsync } from '../lib/useAsync.js';
-import { buildProfileUrl } from '../vk/bridge.js';
 
 export function UserPanel({ id, view }: { id: string; view: string }): ReactNode {
   const routeNavigator = useRouteNavigator();
@@ -86,18 +84,7 @@ export function UserPanel({ id, view }: { id: string; view: string }): ReactNode
         >
           {fullName(data.user)}
         </SimpleCell>
-        <Div>
-          <Button
-            size="l"
-            mode="secondary"
-            stretched
-            href={buildProfileUrl(data.user.vkUserId)}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Открыть страницу ВКонтакте
-          </Button>
-        </Div>
+        <ContactButtons user={data.user} />
       </Group>
 
       <UserProfileBody profile={data} />

@@ -11,6 +11,7 @@
 import { z } from 'zod';
 
 import { isKnownCity, isKnownRoute } from './cities.js';
+import { normalizePhone } from './phone.js';
 import {
   ERROR_CODE,
   LIMITS,
@@ -57,12 +58,40 @@ export type ErrorResponse = z.infer<typeof errorResponseSchema>;
 
 /* ──────────────────────────── пользователь ──────────────────────────── */
 
+/**
+ * Введённый номер → `+7XXXXXXXXXX`, либо ошибка.
+ *
+ * Пустая строка — это «номер не указан», а не ошибка: поле необязательное,
+ * и очистить его надо уметь.
+ */
+export const phoneInputSchema = z
+  .string()
+  .trim()
+  .transform((value) => (value === '' ? null : value))
+  .nullable()
+  .transform((value, ctx) => {
+    if (value === null) {
+      return null;
+    }
+    const normalized = normalizePhone(value);
+    if (normalized === null) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Укажите мобильный номер в виде +7 999 123-45-67',
+      });
+      return z.NEVER;
+    }
+    return normalized;
+  });
+
 export const userPublicSchema = z.object({
   vkUserId: vkUserIdSchema,
   firstName: z.string(),
   lastName: z.string(),
   photoUrl: z.string().nullable(),
   city: z.string().nullable(),
+  /** Мобильный для звонка. null — не указан, кнопки «Позвонить» не будет. */
+  phone: z.string().nullable(),
   ratingAvg: z.number(),
   ratingCount: z.number().int(),
 });

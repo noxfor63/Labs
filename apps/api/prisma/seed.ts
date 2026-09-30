@@ -153,12 +153,17 @@ async function main(prisma: PrismaClient): Promise<void> {
   await prisma.user.deleteMany();
 
   await prisma.user.createMany({
-    data: PEOPLE.map((person) => ({
+    data: PEOPLE.map((person, index) => ({
       vkUserId: person.vkUserId,
       firstName: person.firstName,
       lastName: person.lastName,
       city: person.city,
       photoUrl: null,
+      // Номера из диапазона 999, который не выдаётся операторами, — по ним
+      // никуда не дозвониться, даже если сид случайно уедет не туда.
+      // Каждому третьему номер не задан: кнопка «Позвонить» должна
+      // проверяться и в состоянии «номера нет».
+      phone: index % 3 === 2 ? null : `+79990000${String(index).padStart(3, '0')}`,
       ratingAvg: 0,
       ratingCount: 0,
     })),
