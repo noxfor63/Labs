@@ -1,5 +1,5 @@
 import type { TripRequestDto } from '@vk-rideshare/shared';
-import { Icon20CarOutline, Icon20PlaceOutline } from '@vkontakte/icons';
+import { Icon20CarOutline, Icon20PhoneOutline, Icon20PlaceOutline } from '@vkontakte/icons';
 import { useActiveVkuiLocation, useParams, useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import {
   Avatar,
@@ -159,6 +159,11 @@ export function TripPanel({ id, view }: { id: string; view: string }): ReactNode
 
   const dayLabel = formatDayLabel(trip.departAt, new Date(now));
   const isPast = new Date(trip.departAt).getTime() <= now;
+  /** Своя живая поездка без номера в профиле — тот случай, про который стоит напомнить. */
+  const needsPhone =
+    trip.isAuthor &&
+    trip.status === 'ACTIVE' &&
+    (trip.author.phone === null || trip.author.phone === '');
   const canRespond =
     !trip.isAuthor &&
     trip.status === 'ACTIVE' &&
@@ -265,7 +270,41 @@ export function TripPanel({ id, view }: { id: string; view: string }): ReactNode
           {fullName(trip.author)}
         </SimpleCell>
 
-        {!trip.isAuthor && <ContactButtons user={trip.author} />}
+        {trip.isAuthor ? (
+          needsPhone && (
+            <Div>
+              {/*
+                Автор видит это на своей же поездке: там, где у чужой стоят
+                кнопки связи, у своей было пустое место, и про номер просто
+                забывали. Телефон берём из trip.author — на своей поездке
+                это и есть текущий пользователь.
+              */}
+              <div
+                className="app-tile"
+                style={{ display: 'flex', alignItems: 'center', gap: 'var(--app-space-3)' }}
+              >
+                <Icon20PhoneOutline style={{ color: 'var(--vkui--color_icon_secondary)' }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <Subhead weight="2">Добавьте номер телефона</Subhead>
+                  <Caption level="1" style={{ color: 'var(--vkui--color_text_secondary)' }}>
+                    Без него попутчики не смогут вам позвонить
+                  </Caption>
+                </div>
+                <Button
+                  size="s"
+                  mode="secondary"
+                  onClick={() => {
+                    void routeNavigator.push('/profile');
+                  }}
+                >
+                  Добавить
+                </Button>
+              </div>
+            </Div>
+          )
+        ) : (
+          <ContactButtons user={trip.author} />
+        )}
       </Group>
 
       {trip.isAuthor ? (
