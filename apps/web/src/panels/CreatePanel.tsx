@@ -29,15 +29,16 @@ import {
 import { useState, type ReactNode } from 'react';
 
 import { ApiRequestError, api } from '../api/client.js';
+import { FilterChips, type ChipOption } from '../components/FilterChips.js';
 import { PhoneField } from '../components/PhoneField.js';
 import { toDateInputValue } from '../lib/format.js';
 import { useSession } from '../lib/SessionContext.js';
 import { useSnackbar } from '../lib/SnackbarContext.js';
 
-const toOptions = (cities: readonly { name: string }[]) =>
-  cities.map((city) => ({ value: city.name, label: city.name }));
-
-const allCityOptions = toOptions(CITIES);
+const cityChips: readonly ChipOption<string>[] = CITIES.map((city) => ({
+  value: city.name,
+  label: city.name,
+}));
 
 /** 48 получасовых слотов суток — время выезда выбирается только из них. */
 const timeOptions = DEPART_TIME_SLOTS.map((slot) => ({ value: slot, label: slot }));
@@ -49,7 +50,7 @@ const timeOptions = DEPART_TIME_SLOTS.map((slot) => ({ value: slot, label: slot 
  * зато он пускал в поле пустую строку, «3.5» и «e», а на телефоне
  * поднимал цифровую клавиатуру поверх формы ради одного нажатия.
  */
-const seatOptions = SEAT_OPTIONS.map((count) => ({
+const seatChips: readonly ChipOption<string>[] = SEAT_OPTIONS.map((count) => ({
   value: String(count),
   label: String(count),
 }));
@@ -219,8 +220,10 @@ export function CreatePanel({ id }: { id: string }): ReactNode {
 
   // Направления закрытые: показываем только достижимые города,
   // чтобы невозможный маршрут нельзя было и собрать.
-  const toCityOptions =
-    form.fromCity === '' ? allCityOptions : toOptions(destinationsFrom(form.fromCity));
+  const toCityChips: readonly ChipOption<string>[] =
+    form.fromCity === ''
+      ? cityChips
+      : destinationsFrom(form.fromCity).map((city) => ({ value: city.name, label: city.name }));
 
   const pickFromCity = (value: string): void => {
     update('fromCity', value);
@@ -249,28 +252,22 @@ export function CreatePanel({ id }: { id: string }): ReactNode {
       </Group>
 
       <Group header={<Header size="s">Маршрут</Header>}>
+        {/*
+          Те же «таблетки», что в поиске. Городов три, набор закрытый —
+          выпадающий список здесь был лишним шагом: открыть, выбрать,
+          закрыть вместо одного касания. Заодно оба города видны рядом, и
+          маршрут читается целиком, а не двумя полями через форму.
+        */}
         <FormItem
           top="Откуда"
           status={errors['fromCity'] === undefined ? 'default' : 'error'}
           bottom={errors['fromCity']}
         >
-          <CustomSelect
-            placeholder="Выберите город"
-            options={allCityOptions}
-            value={form.fromCity === '' ? null : form.fromCity}
-            onChange={(_, value) => {
-              pickFromCity(value === null ? '' : String(value));
-            }}
-          />
-        </FormItem>
-        <FormItem top="Место сбора (необязательно)">
-          <Input
-            maxLength={LIMITS.POINT_MAX}
-            placeholder="Например, автовокзал"
-            value={form.fromPoint}
-            onChange={(event) => {
-              update('fromPoint', event.target.value);
-            }}
+          <FilterChips
+            ariaLabel="Город отправления"
+            options={cityChips}
+            value={form.fromCity}
+            onChange={pickFromCity}
           />
         </FormItem>
 
@@ -279,25 +276,41 @@ export function CreatePanel({ id }: { id: string }): ReactNode {
           status={errors['toCity'] === undefined ? 'default' : 'error'}
           bottom={errors['toCity']}
         >
-          <CustomSelect
-            placeholder="Выберите город"
-            options={toCityOptions}
-            value={form.toCity === '' ? null : form.toCity}
-            onChange={(_, value) => {
-              update('toCity', value === null ? '' : String(value));
+          <FilterChips
+            ariaLabel="Город назначения"
+            options={toCityChips}
+            value={form.toCity}
+            onChange={(value) => {
+              update('toCity', value);
             }}
           />
         </FormItem>
-        <FormItem top="Место высадки (необязательно)">
-          <Input
-            maxLength={LIMITS.POINT_MAX}
-            placeholder="Например, у центрального рынка"
-            value={form.toPoint}
-            onChange={(event) => {
-              update('toPoint', event.target.value);
-            }}
-          />
-        </FormItem>
+
+        {/* Точки сбора и высадки — после обоих городов: сначала «куда едем»,
+            потом подробности. Раньше они стояли между городами и разрывали
+            маршрут пополам. */}
+        <FormLayoutGroup mode="horizontal">
+          <FormItem top="Место сбора">
+            <Input
+              maxLength={LIMITS.POINT_MAX}
+              placeholder="Необязательно"
+              value={form.fromPoint}
+              onChange={(event) => {
+                update('fromPoint', event.target.value);
+              }}
+            />
+          </FormItem>
+          <FormItem top="Место высадки">
+            <Input
+              maxLength={LIMITS.POINT_MAX}
+              placeholder="Необязательно"
+              value={form.toPoint}
+              onChange={(event) => {
+                update('toPoint', event.target.value);
+              }}
+            />
+          </FormItem>
+        </FormLayoutGroup>
       </Group>
 
       <Group header={<Header size="s">Когда и на каких условиях</Header>}>
@@ -330,39 +343,41 @@ export function CreatePanel({ id }: { id: string }): ReactNode {
           </FormItem>
         </FormLayoutGroup>
 
-        <FormLayoutGroup mode="horizontal">
-          <FormItem
-            top={isDriver ? 'Свободных мест' : 'Сколько вас едет'}
-            status={errors['seatsTotal'] === undefined ? 'default' : 'error'}
-            bottom={errors['seatsTotal']}
-          >
-            <CustomSelect
-              options={seatOptions}
-              value={form.seatsTotal}
-              onChange={(_, value) => {
-                update('seatsTotal', value === null ? '' : String(value));
-              }}
-            />
-          </FormItem>
-          <FormItem
-            top="Цена с человека, ₽"
-            status={errors['priceRub'] === undefined ? 'default' : 'error'}
-            bottom={errors['priceRub'] ?? `От ${LIMITS.PRICE_MIN} до ${LIMITS.PRICE_MAX}`}
-          >
-            <Input
-              type="number"
-              inputMode="numeric"
-              min={LIMITS.PRICE_MIN}
-              max={LIMITS.PRICE_MAX}
-              step={50}
-              required
-              value={form.priceRub}
-              onChange={(event) => {
-                update('priceRub', event.target.value);
-              }}
-            />
-          </FormItem>
-        </FormLayoutGroup>
+        <FormItem
+          top={isDriver ? 'Свободных мест' : 'Сколько вас едет'}
+          status={errors['seatsTotal'] === undefined ? 'default' : 'error'}
+          bottom={errors['seatsTotal']}
+        >
+          {/* Шесть однозначных чисел помещаются в строку — выпадающий
+              список ради них открывать незачем. */}
+          <FilterChips
+            ariaLabel="Количество мест"
+            options={seatChips}
+            value={form.seatsTotal}
+            onChange={(value) => {
+              update('seatsTotal', value);
+            }}
+          />
+        </FormItem>
+
+        <FormItem
+          top="Цена с человека, ₽"
+          status={errors['priceRub'] === undefined ? 'default' : 'error'}
+          bottom={errors['priceRub'] ?? `От ${LIMITS.PRICE_MIN} до ${LIMITS.PRICE_MAX}`}
+        >
+          <Input
+            type="number"
+            inputMode="numeric"
+            min={LIMITS.PRICE_MIN}
+            max={LIMITS.PRICE_MAX}
+            step={50}
+            required
+            value={form.priceRub}
+            onChange={(event) => {
+              update('priceRub', event.target.value);
+            }}
+          />
+        </FormItem>
 
         {isDriver && (
           <FormItem top="Автомобиль (необязательно)">
