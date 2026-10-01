@@ -10,7 +10,10 @@ import {
   useRouteNavigator,
 } from '@vkontakte/vk-mini-apps-router';
 import {
+  Button,
+  Div,
   Epic,
+  Footer,
   Group,
   ModalRoot,
   Panel,
@@ -23,8 +26,9 @@ import {
   TabbarItem,
   View,
 } from '@vkontakte/vkui';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
+import { getLaunchParamsSource, type LaunchParamsSource } from './api/launch-params.js';
 import { ErrorState } from './components/ErrorState.js';
 import { useSession } from './lib/SessionContext.js';
 import { ReviewModal } from './modals/ReviewModal.js';
@@ -72,9 +76,19 @@ const TABS = [
   },
 ] as const;
 
+/** Человеческое объяснение того, откуда взялись (или не взялись) параметры запуска. */
+const LAUNCH_SOURCE_HINT: Record<LaunchParamsSource, string> = {
+  address: 'Параметры запуска найдены в адресе приложения.',
+  cache: 'В адресе параметров запуска нет, взяты сохранённые с прошлого открытия.',
+  none: 'Параметры запуска не найдены ни в адресе, ни в сохранённых.',
+};
+
 export function App(): ReactNode {
   const { view: activeView = VIEW.SEARCH, panel: activePanel, modal: activeModal } =
     useActiveVkuiLocation();
+  // Снимок на момент запуска: читает адрес и хранилище, поэтому вызывать
+  // его прямо в теле рендера нельзя — значение менялось бы само по себе.
+  const [launchSource] = useState<LaunchParamsSource>(getLaunchParamsSource);
   const routeNavigator = useRouteNavigator();
   const routerPopout = usePopout();
   const session = useSession();
@@ -116,10 +130,25 @@ export function App(): ReactNode {
               <PanelHeader>Поиск попутчиков</PanelHeader>
               <Group>
                 {session.error.status === 401 ? (
-                  <Placeholder title="Не удалось подтвердить запуск">
-                    Откройте приложение из ВКонтакте. Для локальной разработки задайте
-                    VK_MOCK_LAUNCH_PARAMS в .env.
-                  </Placeholder>
+                  <>
+                    <Placeholder title="Не удалось подтвердить запуск">
+                      {session.error.message}
+                    </Placeholder>
+                    <Div>
+                      <Button size="l" stretched onClick={session.reload}>
+                        Повторить
+                      </Button>
+                    </Div>
+                    {/*
+                      Техническая строка внизу: без неё «не подтвердился запуск»
+                      выглядит одинаково и когда параметров нет в адресе, и когда
+                      они есть, но протухли, — а чинится это по-разному.
+                    */}
+                    <Footer>
+                      {LAUNCH_SOURCE_HINT[launchSource]}
+                      {' Вне ВКонтакте задайте VK_MOCK_LAUNCH_PARAMS в .env.'}
+                    </Footer>
+                  </>
                 ) : (
                   <ErrorState error={session.error} onRetry={session.reload} />
                 )}

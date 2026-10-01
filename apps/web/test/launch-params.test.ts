@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { getLaunchParams } from '../src/api/launch-params.js';
+import { getLaunchParams, getLaunchParamsSource } from '../src/api/launch-params.js';
 
 const QUERY =
   'vk_user_id=1000001&vk_app_id=51234567&vk_platform=desktop_web&sign=abcdef';
@@ -39,6 +39,24 @@ describe('чтение launch-параметров', () => {
 
   it('без параметров и без кэша возвращает пустую строку', () => {
     expect(getLaunchParams()).toBe('');
+  });
+
+  it('находит параметры сразу после решётки, без «?»', () => {
+    // Такую форму адреса отдают не все клиенты, но проверка дешёвая,
+    // а отличить её от «параметров нет» по экрану невозможно.
+    setLocation('', `#${QUERY}`);
+    expect(getLaunchParams()).toBe(QUERY);
+  });
+
+  it('сообщает, откуда взяты параметры', () => {
+    expect(getLaunchParamsSource()).toBe('none');
+
+    setLocation(`?${QUERY}`);
+    expect(getLaunchParamsSource()).toBe('address');
+
+    getLaunchParams();
+    setLocation('', '#/my');
+    expect(getLaunchParamsSource()).toBe('cache');
   });
 
   it('строку не пересобирает: порядок ключей сохраняется', () => {
