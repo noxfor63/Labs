@@ -1,6 +1,7 @@
 {
   "static_path": "dist",
   "app_id": 51234567,
+  "noprompt": true,
   "update_prod": 1,
   "update_dev": 0,
   "endpoints": {
