@@ -10,7 +10,8 @@ import {
   PanelHeader,
   PanelSpinner,
   Placeholder,
-  SimpleCell,
+  Subhead,
+  Title,
 } from '@vkontakte/vkui';
 import { useCallback, useState, type ReactNode } from 'react';
 
@@ -96,12 +97,15 @@ export function ProfilePanel({ id, view }: { id: string; view: string }): ReactN
       <PanelHeader>Профиль</PanelHeader>
 
       <Group>
-        <SimpleCell
-          before={<Avatar size={72} src={session.user.photoUrl ?? undefined} />}
-          subtitle={session.user.city ?? 'Город не указан'}
-        >
-          {fullName(session.user)}
-        </SimpleCell>
+        <Div style={{ display: 'flex', alignItems: 'center', gap: 'var(--app-space-4)' }}>
+          <Avatar size={72} src={session.user.photoUrl ?? undefined} />
+          <div style={{ minWidth: 0 }}>
+            <Title level="2">{fullName(session.user)}</Title>
+            <Subhead style={{ color: 'var(--vkui--color_text_secondary)' }}>
+              {session.user.city ?? 'Город не указан'}
+            </Subhead>
+          </div>
+        </Div>
       </Group>
 
       <Group header={<Header size="s">Связь</Header>}>

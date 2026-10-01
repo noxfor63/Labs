@@ -22,7 +22,6 @@ import {
   Panel,
   PanelHeader,
   Placeholder,
-  SegmentedControl,
   Spinner,
 } from '@vkontakte/vkui';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -79,11 +78,25 @@ const seatsOptions = [
 
 type RoleFilter = TripRole | 'ANY';
 
-const CHIPS_LABEL_STYLE = {
-  display: 'block',
-  marginBottom: 6,
-  color: 'var(--vkui--color_text_secondary)',
-} as const;
+const ROLE_CHIPS: readonly ChipOption<RoleFilter>[] = [
+  { value: 'ANY', label: 'Все' },
+  { value: 'DRIVER', label: 'Водители' },
+  { value: 'PASSENGER', label: 'Пассажиры' },
+];
+
+/**
+ * Подпись над рядом «таблеток».
+ *
+ * Отдельный компонент, а не разметка на месте: подписей четыре, и если
+ * задавать отступы каждой руками, они разъедутся на первой же правке.
+ */
+function FilterLabel({ children }: { children: string }): ReactNode {
+  return (
+    <Caption level="1" weight="2" className="app-field-label">
+      {children}
+    </Caption>
+  );
+}
 
 export function SearchPanel({ id }: { id: string }): ReactNode {
   const routeNavigator = useRouteNavigator();
@@ -265,35 +278,50 @@ export function SearchPanel({ id }: { id: string }): ReactNode {
       <PanelHeader>Поиск попутчиков</PanelHeader>
 
       <Group>
-        <Div style={{ paddingBottom: 0 }}>
-          <Caption level="1" style={CHIPS_LABEL_STYLE}>
-            Откуда
-          </Caption>
-          <FilterChips
-            ariaLabel="Город отправления"
-            options={CITY_CHIPS}
-            value={from}
-            onChange={pickFrom}
-          />
+        <Div
+          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--app-space-4)' }}
+        >
+          <div>
+            <FilterLabel>Откуда</FilterLabel>
+            <FilterChips
+              ariaLabel="Город отправления"
+              options={CITY_CHIPS}
+              value={from}
+              onChange={pickFrom}
+            />
+          </div>
 
           {from !== ANY && (
-            <>
-              <Caption level="1" style={{ ...CHIPS_LABEL_STYLE, marginTop: 12 }}>
-                Куда
-              </Caption>
+            <div>
+              <FilterLabel>Куда</FilterLabel>
               <FilterChips
                 ariaLabel="Город назначения"
                 options={toChips}
                 value={to}
                 onChange={setTo}
               />
-            </>
+            </div>
           )}
 
-          <Caption level="1" style={{ ...CHIPS_LABEL_STYLE, marginTop: 12 }}>
-            Когда
-          </Caption>
-          <FilterChips ariaLabel="День поездки" options={DAY_CHIPS} value={day} onChange={setDay} />
+          <div>
+            <FilterLabel>Когда</FilterLabel>
+            <FilterChips
+              ariaLabel="День поездки"
+              options={DAY_CHIPS}
+              value={day}
+              onChange={setDay}
+            />
+          </div>
+
+          <div>
+            <FilterLabel>Кого ищете</FilterLabel>
+            <FilterChips
+              ariaLabel="Роль автора объявления"
+              options={ROLE_CHIPS}
+              value={role}
+              onChange={setRole}
+            />
+          </div>
         </Div>
 
         {day === 'CUSTOM' && (
@@ -307,20 +335,6 @@ export function SearchPanel({ id }: { id: string }): ReactNode {
             />
           </FormItem>
         )}
-
-        <FormItem top="Кого ищете">
-          <SegmentedControl
-            value={role}
-            onChange={(value) => {
-              setRole(value as RoleFilter);
-            }}
-            options={[
-              { label: 'Все', value: 'ANY' },
-              { label: 'Водители', value: 'DRIVER' },
-              { label: 'Пассажиры', value: 'PASSENGER' },
-            ]}
-          />
-        </FormItem>
 
         {showMore && (
           <FormLayoutGroup mode="horizontal">
@@ -345,20 +359,24 @@ export function SearchPanel({ id }: { id: string }): ReactNode {
           </FormLayoutGroup>
         )}
 
-        <Div style={{ display: 'flex', gap: 8 }}>
-          <Button
-            size="m"
-            mode="tertiary"
+        <Div style={{ display: 'flex', gap: 'var(--app-space-2)', paddingTop: 0 }}>
+          <button
+            type="button"
+            className="app-chip"
             onClick={() => {
               setShowMore((value) => !value);
             }}
           >
-            {showMore ? 'Свернуть фильтры' : 'Ещё фильтры'}
-          </Button>
+            <Caption level="1" weight="2">
+              {showMore ? 'Свернуть' : 'Ещё фильтры'}
+            </Caption>
+          </button>
           {hasFilters && (
-            <Button size="m" mode="tertiary" onClick={reset}>
-              Сбросить
-            </Button>
+            <button type="button" className="app-chip" onClick={reset}>
+              <Caption level="1" weight="2">
+                Сбросить
+              </Caption>
+            </button>
           )}
         </Div>
       </Group>

@@ -165,14 +165,9 @@ export function App(): ReactNode {
       <SplitCol width="100%" maxWidth={560} stretchedOnMobile autoSpaced>
         <Epic
           activeStory={activeView}
+          // Вид панели — в styles/app.css: высота, граница, подписи, акцент.
           tabbar={
-            <Tabbar
-              plain
-              style={{
-                borderTop: '1px solid var(--vkui--color_separator_primary)',
-                background: 'var(--vkui--color_background_content)',
-              }}
-            >
+            <Tabbar plain>
               {TABS.map((tab) => (
                 <TabbarItem
                   key={tab.view}

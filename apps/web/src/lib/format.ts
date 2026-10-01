@@ -59,6 +59,17 @@ export function formatDayLabel(iso: string, now: Date = new Date()): string {
   return DAY_SHORT_FORMAT.format(new Date(iso));
 }
 
+/**
+ * Разделитель между днём и временем.
+ *
+ * «Завтра» — через запятую, а «сб, 4 окт.» — через точку: иначе получается
+ * «сб, 4 окт., 14:30» с двумя запятыми подряд, и строка выглядит так,
+ * будто её собрали конкатенацией не глядя.
+ */
+export function dayTimeSeparator(dayLabel: string): string {
+  return dayLabel.includes(',') ? ' · ' : ', ';
+}
+
 /** «Сегодня в 09:30», «сб, 4 окт. в 09:30» — для заголовков и деталей. */
 export function formatDayAndTime(iso: string, now: Date = new Date()): string {
   return `${formatDayLabel(iso, now)} в ${formatTime(iso)}`;

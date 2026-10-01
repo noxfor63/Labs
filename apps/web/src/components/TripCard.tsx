@@ -6,10 +6,11 @@ import {
   Icon20HandOutline,
   Icon20UsersOutline,
 } from '@vkontakte/icons';
-import { Avatar, Caption, Card, Headline, Subhead, Text } from '@vkontakte/vkui';
+import { Avatar, Caption, Headline, Subhead } from '@vkontakte/vkui';
 import type { ReactNode } from 'react';
 
 import {
+  dayTimeSeparator,
   formatDayLabel,
   formatPrice,
   formatSeats,
@@ -42,122 +43,142 @@ export function TripCard({
   /**
    * Текущее время миллисекундами. Приходит извне, а не берётся здесь
    * через Date.now(): вызов в теле рендера нечист — значение меняется
-   * само по себе между рендерами, и React вправе на этом споткнуться.
-   * Источник — useNow() на уровне экрана.
+   * само по себе между рендерами. Источник — useNow() на уровне экрана.
    */
   now: number;
   onClick: () => void;
 }): ReactNode {
   const isDriver = trip.role === 'DRIVER';
-  const at = new Date(now);
   const state = stateBadge(trip);
-  // Прошедшая или закрытая поездка не должна спорить за внимание с живыми.
-  const isDimmed = state !== null;
+  const at = new Date(now);
+  const dayLabel = formatDayLabel(trip.departAt, at);
 
-  const seatsTone: BadgeTone = trip.seatsLeft === 0 ? 'negative' : 'neutral';
+  const points = [
+    trip.fromPoint === null ? null : `от: ${trip.fromPoint}`,
+    trip.toPoint === null ? null : `до: ${trip.toPoint}`,
+  ].filter((part) => part !== null);
 
   return (
-    <Card mode="shadow" onClick={onClick} style={{ cursor: 'pointer' }}>
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 10,
-          padding: 16,
-          opacity: isDimmed ? 0.6 : 1,
-        }}
-      >
-        {/* Когда и почём — то, по чему ленту просматривают по диагонали. */}
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
-          <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6, minWidth: 0 }}>
-            <Subhead weight="2" style={{ color: 'var(--vkui--color_text_secondary)' }}>
-              {formatDayLabel(trip.departAt, at)}
-            </Subhead>
-            <Headline level="1" weight="1">
-              {formatTime(trip.departAt)}
-            </Headline>
-          </span>
-          <Headline
-            level="1"
-            weight="1"
-            style={{ whiteSpace: 'nowrap', color: 'var(--vkui--color_text_accent_themed)' }}
-          >
-            {formatPrice(trip.priceRub)}
-          </Headline>
-        </div>
-
-        {/* Маршрут. Стрелка — иконкой, чтобы её цвет и размер задавались
-            темой, а не начертанием системного шрифта. Экранному диктору
-            иконка ничего не скажет, поэтому у строки есть aria-label. */}
+    <div
+      className="app-card app-card--tappable"
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onClick();
+        }
+      }}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--app-space-3)',
+        padding: 'var(--app-space-4)',
+        // Прошедшая или закрытая поездка не должна спорить за внимание с живыми.
+        opacity: state === null ? 1 : 0.55,
+      }}
+    >
+      {/* Маршрут и цена на одной линии: по ним ленту просматривают по диагонали. */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--app-space-3)' }}>
         <div
           aria-label={`${trip.fromCity} → ${trip.toCity}`}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 6,
+            flex: 1,
+            minWidth: 0,
+          }}
         >
-          <Text weight="2">{trip.fromCity}</Text>
+          <Headline level="1" weight="2">
+            {trip.fromCity}
+          </Headline>
+          {/* Стрелка иконкой: её цвет и размер задаёт тема, а не системный шрифт. */}
           <Icon20ArrowRightOutline
             width={16}
             height={16}
             style={{ color: 'var(--vkui--color_icon_secondary)' }}
           />
-          <Text weight="2">{trip.toCity}</Text>
+          <Headline level="1" weight="2">
+            {trip.toCity}
+          </Headline>
         </div>
 
-        {(trip.fromPoint !== null || trip.toPoint !== null) && (
+        {/* Цена — токеном accent_blue, а не accent_themed: второй в тёмной
+            теме равен #fff, и цена там сливалась с остальным текстом. */}
+        <Headline
+          level="1"
+          weight="2"
+          style={{ whiteSpace: 'nowrap', color: 'var(--vkui--color_accent_blue)' }}
+        >
+          {formatPrice(trip.priceRub)}
+        </Headline>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--app-space-1)' }}>
+        <Subhead style={{ color: 'var(--vkui--color_text_secondary)' }}>
+          {`${dayLabel}${dayTimeSeparator(dayLabel)}`}
+          <span style={{ fontWeight: 600, color: 'var(--vkui--color_text_primary)' }}>
+            {formatTime(trip.departAt)}
+          </span>
+        </Subhead>
+
+        {points.length > 0 && (
           <Caption level="1" style={{ color: 'var(--vkui--color_text_secondary)' }}>
-            {[
-              trip.fromPoint === null ? null : `от: ${trip.fromPoint}`,
-              trip.toPoint === null ? null : `до: ${trip.toPoint}`,
-            ]
-              .filter((part) => part !== null)
-              .join(' · ')}
+            {points.join(' · ')}
           </Caption>
         )}
-
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          <Badge
-            tone={isDriver ? 'positive' : 'accent'}
-            icon={
-              isDriver ? (
-                <Icon20CarOutline width={16} height={16} />
-              ) : (
-                <Icon20HandOutline width={16} height={16} />
-              )
-            }
-          >
-            {isDriver ? 'За рулём' : 'Ищет водителя'}
-          </Badge>
-
-          <Badge tone={seatsTone} icon={<Icon20UsersOutline width={16} height={16} />}>
-            {trip.seatsLeft > 0 ? `Свободно ${formatSeats(trip.seatsLeft)}` : 'Мест нет'}
-          </Badge>
-
-          {state !== null && (
-            <Badge tone={state.tone} icon={<Icon16ClockOutline />}>
-              {state.label}
-            </Badge>
-          )}
-        </div>
-
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            paddingTop: 10,
-            borderTop: '1px solid var(--vkui--color_separator_primary)',
-          }}
-        >
-          <Avatar size={28} src={trip.author.photoUrl ?? undefined} />
-          <Caption level="1" style={{ flex: 1, minWidth: 0 }}>
-            {fullName(trip.author)}
-          </Caption>
-          <RatingBadge
-            ratingAvg={trip.author.ratingAvg}
-            ratingCount={trip.author.ratingCount}
-            withCount={false}
-          />
-        </div>
       </div>
-    </Card>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        <Badge
+          tone={isDriver ? 'positive' : 'accent'}
+          icon={
+            isDriver ? (
+              <Icon20CarOutline width={16} height={16} />
+            ) : (
+              <Icon20HandOutline width={16} height={16} />
+            )
+          }
+        >
+          {isDriver ? 'За рулём' : 'Ищет водителя'}
+        </Badge>
+
+        <Badge
+          tone={trip.seatsLeft === 0 ? 'negative' : 'neutral'}
+          icon={<Icon20UsersOutline width={16} height={16} />}
+        >
+          {trip.seatsLeft > 0 ? `Свободно ${formatSeats(trip.seatsLeft)}` : 'Мест нет'}
+        </Badge>
+
+        {state !== null && (
+          <Badge tone={state.tone} icon={<Icon16ClockOutline />}>
+            {state.label}
+          </Badge>
+        )}
+      </div>
+
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--app-space-2)',
+          paddingTop: 'var(--app-space-3)',
+          borderTop: 'var(--app-hairline)',
+        }}
+      >
+        <Avatar size={28} src={trip.author.photoUrl ?? undefined} />
+        <Caption level="1" style={{ flex: 1, minWidth: 0 }}>
+          {fullName(trip.author)}
+        </Caption>
+        <RatingBadge
+          ratingAvg={trip.author.ratingAvg}
+          ratingCount={trip.author.ratingCount}
+          withCount={false}
+        />
+      </div>
+    </div>
   );
 }

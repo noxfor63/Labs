@@ -9,6 +9,8 @@ import { StrictMode, useEffect, useState, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import '@vkontakte/vkui/dist/vkui.css';
+// Своя визуальная система — после VKUI, чтобы переопределения сработали.
+import './styles/app.css';
 
 import { App } from './App.js';
 import { SessionProvider } from './lib/SessionContext.js';

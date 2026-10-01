@@ -1,19 +1,16 @@
 import type { TripRequestDto } from '@vk-rideshare/shared';
-import {
-  Icon20CarOutline,
-  Icon20MoneyCircleOutline,
-  Icon20PlaceOutline,
-  Icon20UsersOutline,
-} from '@vkontakte/icons';
+import { Icon20CarOutline, Icon20PlaceOutline } from '@vkontakte/icons';
 import { useActiveVkuiLocation, useParams, useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import {
   Avatar,
   Button,
+  Caption,
   Div,
   Footer,
   FormItem,
   Group,
   Header,
+  Headline,
   MiniInfoCell,
   Panel,
   PanelHeader,
@@ -22,6 +19,7 @@ import {
   Placeholder,
   SimpleCell,
   Spacing,
+  Subhead,
   Text,
   Textarea,
   Title,
@@ -33,9 +31,10 @@ import { ContactButtons } from '../components/ContactButtons.js';
 import { ErrorState } from '../components/ErrorState.js';
 import { RatingBadge } from '../components/RatingBadge.js';
 import {
-  formatDateTime,
+  dayTimeSeparator,
+  formatDayLabel,
   formatPrice,
-  formatSeats,
+  formatTime,
   fullName,
 } from '../lib/format.js';
 import { useAsync } from '../lib/useAsync.js';
@@ -158,6 +157,7 @@ export function TripPanel({ id, view }: { id: string; view: string }): ReactNode
     );
   }
 
+  const dayLabel = formatDayLabel(trip.departAt, new Date(now));
   const isPast = new Date(trip.departAt).getTime() <= now;
   const canRespond =
     !trip.isAuthor &&
@@ -171,14 +171,52 @@ export function TripPanel({ id, view }: { id: string; view: string }): ReactNode
       {header}
 
       <Group>
-        <Div>
-          <Title level="2">
-            {trip.fromCity} → {trip.toCity}
-          </Title>
-          <Spacing size={8} />
-          <Text style={{ color: 'var(--vkui--color_text_secondary)' }}>
-            {formatDateTime(trip.departAt)}
-          </Text>
+        <Div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--app-space-4)' }}>
+          <div>
+            <Title level="2">
+              {trip.fromCity} → {trip.toCity}
+            </Title>
+            <Spacing size={6} />
+            <Subhead style={{ color: 'var(--vkui--color_text_secondary)' }}>
+              {`${dayLabel}${dayTimeSeparator(dayLabel)}`}
+              <span style={{ fontWeight: 600, color: 'var(--vkui--color_text_primary)' }}>
+                {formatTime(trip.departAt)}
+              </span>
+            </Subhead>
+          </div>
+
+          {/* Два числа, ради которых сюда и заходят. */}
+          <div style={{ display: 'flex', gap: 'var(--app-space-2)' }}>
+            <div className="app-tile">
+              <Caption level="1" weight="2" className="app-field-label">
+                Цена
+              </Caption>
+              <Headline
+                level="1"
+                weight="1"
+                style={{ color: 'var(--vkui--color_accent_blue)' }}
+              >
+                {formatPrice(trip.priceRub)}
+              </Headline>
+            </div>
+
+            <div className="app-tile">
+              <Caption level="1" weight="2" className="app-field-label">
+                Места
+              </Caption>
+              <Headline
+                level="1"
+                weight="1"
+                style={
+                  trip.seatsLeft === 0
+                    ? { color: 'var(--vkui--color_text_negative)' }
+                    : undefined
+                }
+              >
+                {trip.seatsLeft > 0 ? `${trip.seatsLeft} из ${trip.seatsTotal}` : 'Мест нет'}
+              </Headline>
+            </div>
+          </div>
         </Div>
 
         {(trip.fromPoint !== null || trip.toPoint !== null) && (
@@ -191,16 +229,6 @@ export function TripPanel({ id, view }: { id: string; view: string }): ReactNode
               .join(' · ')}
           </MiniInfoCell>
         )}
-
-        <MiniInfoCell before={<Icon20MoneyCircleOutline />}>
-          {formatPrice(trip.priceRub)}
-        </MiniInfoCell>
-
-        <MiniInfoCell before={<Icon20UsersOutline />}>
-          {trip.seatsLeft > 0
-            ? `Свободно ${formatSeats(trip.seatsLeft)} из ${trip.seatsTotal}`
-            : `Мест нет · всего ${formatSeats(trip.seatsTotal)}`}
-        </MiniInfoCell>
 
         <MiniInfoCell before={<Icon20CarOutline />}>
           {trip.role === 'DRIVER'

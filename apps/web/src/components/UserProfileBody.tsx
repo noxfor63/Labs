@@ -1,8 +1,8 @@
 import type { UserProfileResponse } from '@vk-rideshare/shared';
-import { Avatar, Footer, Group, Header, InfoRow, SimpleCell, Div } from '@vkontakte/vkui';
+import { Avatar, Caption, Div, Footer, Group, Header, Headline, SimpleCell } from '@vkontakte/vkui';
 import type { ReactNode } from 'react';
 
-import { formatDate, formatRating, formatTrips, fullName } from '../lib/format.js';
+import { formatDate, formatRating, fullName } from '../lib/format.js';
 import { RatingBadge } from './RatingBadge.js';
 
 /** Общая «начинка» профиля: свой и чужой отличаются только шапкой. */
@@ -16,11 +16,26 @@ export function UserProfileBody({
   return (
     <>
       <Group>
-        <Div style={{ display: 'flex', gap: 24 }}>
-          <InfoRow header="Рейтинг">
-            {formatRating(profile.user.ratingAvg, profile.user.ratingCount)}
-          </InfoRow>
-          <InfoRow header="Завершено">{formatTrips(profile.completedTripsCount)}</InfoRow>
+        {/* Те же плитки, что на экране поездки: одинаковые приёмы на разных
+            экранах и дают ощущение одного приложения, а не набора форм. */}
+        <Div style={{ display: 'flex', gap: 'var(--app-space-2)' }}>
+          <div className="app-tile">
+            <Caption level="1" weight="2" className="app-field-label">
+              Рейтинг
+            </Caption>
+            <Headline level="1" weight="1">
+              {formatRating(profile.user.ratingAvg, profile.user.ratingCount)}
+            </Headline>
+          </div>
+          <div className="app-tile">
+            <Caption level="1" weight="2" className="app-field-label">
+              Поездок
+            </Caption>
+            {/* В плитке только число: подпись сверху уже говорит, чего оно. */}
+            <Headline level="1" weight="1">
+              {profile.completedTripsCount}
+            </Headline>
+          </div>
         </Div>
       </Group>
 

@@ -5,13 +5,15 @@ import {
 } from '@vkontakte/vk-mini-apps-router';
 import {
   Avatar,
+  Div,
   Group,
   Panel,
   PanelHeader,
   PanelHeaderBack,
   PanelSpinner,
   Placeholder,
-  SimpleCell,
+  Subhead,
+  Title,
 } from '@vkontakte/vkui';
 import { useCallback, type ReactNode } from 'react';
 
@@ -78,12 +80,15 @@ export function UserPanel({ id, view }: { id: string; view: string }): ReactNode
       {header}
 
       <Group>
-        <SimpleCell
-          before={<Avatar size={72} src={data.user.photoUrl ?? undefined} />}
-          subtitle={data.user.city ?? 'Город не указан'}
-        >
-          {fullName(data.user)}
-        </SimpleCell>
+        <Div style={{ display: 'flex', alignItems: 'center', gap: 'var(--app-space-4)' }}>
+          <Avatar size={72} src={data.user.photoUrl ?? undefined} />
+          <div style={{ minWidth: 0 }}>
+            <Title level="2">{fullName(data.user)}</Title>
+            <Subhead style={{ color: 'var(--vkui--color_text_secondary)' }}>
+              {data.user.city ?? 'Город не указан'}
+            </Subhead>
+          </div>
+        </Div>
         <ContactButtons user={data.user} />
       </Group>
 

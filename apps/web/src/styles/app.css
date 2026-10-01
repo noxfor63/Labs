@@ -1,0 +1,154 @@
+/*
+ * Визуальная система приложения.
+ *
+ * Один файл вместо inline-стилей по компонентам: отступы, радиусы и тени
+ * должны задаваться в одном месте, иначе «16 тут, 12 там» расползается по
+ * экранам и приложение начинает выглядеть собранным наспех.
+ *
+ * Цвета берутся только из токенов VKUI — они сами переключаются вместе с
+ * темой клиента ВКонтакте, и своя палитра сломала бы это.
+ */
+
+:root {
+  /* Шаг сетки: все отступы кратны 4. */
+  --app-space-1: 4px;
+  --app-space-2: 8px;
+  --app-space-3: 12px;
+  --app-space-4: 16px;
+  --app-space-5: 20px;
+
+  --app-radius-sm: 10px;
+  --app-radius-md: 14px;
+  --app-radius-lg: 18px;
+
+  --app-hairline: 1px solid var(--vkui--color_separator_primary);
+
+  /*
+   * Тень мягкая и широкая, без тёмного ободка: плотная тень под каждой
+   * карточкой — главный признак «сверстано на коленке». В тёмной теме она
+   * почти не видна, и структуру держит волосяная граница.
+   */
+  --app-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 28px -20px rgba(0, 0, 0, 0.45);
+
+  /* Панель выше штатных 48: тесная панель выглядит дёшево. */
+  --vkui_internal--tabbar_height: 58px;
+}
+
+/* ─────────────── карточка ─────────────── */
+
+.app-card {
+  background: var(--vkui--color_background_content);
+  border: var(--app-hairline);
+  border-radius: var(--app-radius-lg);
+  box-shadow: var(--app-shadow-card);
+  transition:
+    transform 0.14s ease,
+    box-shadow 0.14s ease;
+}
+
+.app-card--tappable {
+  cursor: pointer;
+}
+
+/* Отклик на нажатие: без него интерфейс кажется неживым. */
+.app-card--tappable:active {
+  transform: scale(0.985);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+/* ─────────────── нижняя панель ─────────────── */
+
+.vkuiTabbar__host {
+  background: var(--vkui--color_background_content);
+  border-top: var(--app-hairline);
+}
+
+.vkuiTabbarItem__label {
+  --vkui--font_footnote--font_size--regular: 11px;
+  --vkui--font_footnote--line_height--regular: 13px;
+
+  margin-top: var(--app-space-1);
+  letter-spacing: 0.01em;
+}
+
+.vkuiTabbarItem__selected .vkuiTabbarItem__label {
+  font-weight: 600;
+}
+
+.vkuiTabbarItem__icon {
+  transition: transform 0.16s ease;
+}
+
+/* Активная вкладка чуть приподнята — заметно, но не кричит. */
+.vkuiTabbarItem__selected .vkuiTabbarItem__icon {
+  transform: translateY(-1px);
+}
+
+/* ─────────────── фильтр-«таблетки» ─────────────── */
+
+.app-chip {
+  flex: 0 0 auto;
+  border: 1px solid transparent;
+  border-radius: var(--app-radius-sm);
+  background: var(--vkui--color_background_secondary);
+  color: var(--vkui--color_text_primary);
+  cursor: pointer;
+  padding: 7px 12px;
+  transition:
+    background 0.14s ease,
+    color 0.14s ease,
+    transform 0.14s ease;
+}
+
+.app-chip:active {
+  transform: scale(0.96);
+}
+
+/*
+ * Пара токенов выбрана не случайно: в тёмной теме accent_themed и
+ * text_contrast_themed меняются местами (белый фон, чёрный текст),
+ * поэтому контраст сохраняется без отдельной ветки под тему.
+ */
+.app-chip--on {
+  background: var(--vkui--color_background_accent_themed);
+  color: var(--vkui--color_text_contrast_themed);
+}
+
+/* ─────────────── плитка факта ─────────────── */
+
+/*
+ * Цена и места на экране поездки. Отдельными плитками, а не строками
+ * списка: это два числа, за которыми человек сюда и пришёл, а в общем
+ * перечне они терялись наравне с моделью автомобиля.
+ */
+.app-tile {
+  flex: 1 1 0;
+  min-width: 0;
+  background: var(--vkui--color_background_secondary);
+  border-radius: var(--app-radius-md);
+  padding: var(--app-space-3) var(--app-space-4);
+}
+
+/* ─────────────── мелочи ─────────────── */
+
+/* Подпись над группой фильтров. */
+.app-field-label {
+  display: block;
+  margin-bottom: var(--app-space-2);
+  color: var(--vkui--color_text_secondary);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-card,
+  .app-chip,
+  .vkuiTabbarItem__icon {
+    transition: none;
+  }
+
+  .app-card--tappable:active,
+  .app-chip:active {
+    transform: none;
+  }
+}
