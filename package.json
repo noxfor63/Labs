@@ -16,6 +16,7 @@
     "dev:api": "npm run dev -w @vk-rideshare/api",
     "dev:web": "npm run dev -w @vk-rideshare/web",
     "build": "npm run build -w @vk-rideshare/shared && npm run build -w @vk-rideshare/api && npm run build -w @vk-rideshare/web",
+    "build:server": "npm run build -w @vk-rideshare/shared && npm run build -w @vk-rideshare/api",
     "deploy:web": "npm run deploy -w @vk-rideshare/web",
     "typecheck": "npm run build -w @vk-rideshare/shared && npm run typecheck --workspaces --if-present",
     "lint": "eslint .",
