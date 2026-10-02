@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="Поиск попутчиков">
+  <title>Поиск попутчиков</title>
+  <desc>Упрощённый знак для мелких размеров: только метка назначения.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1B45C9"/>
+      <stop offset="0.55" stop-color="#2F7BF0"/>
+      <stop offset="1" stop-color="#24CBE6"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+
+  <!--
+    Для фавикона 32×32 основной знак не годится: пунктир маршрута
+    превращается в кашу из серых точек. Здесь оставлена одна метка, крупно —
+    в мелком размере узнаётся силуэт, а не детали.
+  -->
+  <path d="M 512 788 C 374 618 318 554 318 428 A 194 194 0 1 1 706 428 C 706 554 650 618 512 788 Z"
+        fill="#FFFFFF"/>
+  <circle cx="512" cy="424" r="84" fill="#2F7BF0"/>
+</svg>
