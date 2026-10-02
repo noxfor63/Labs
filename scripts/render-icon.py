@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
-Отрисовка SVG-иконки в PNG через headless Chromium.
+Отрисовка SVG в PNG через headless Chromium.
+
+Размер третьим аргументом: «1024» для квадрата, «1590x400» для баннера.
 
 Зачем свой скрипт: в окружении нет ни rsvg-convert, ни ImageMagick, ни
 Pillow. Chromium снимает кадр размером с окно, а вьюпорт меньше окна на
@@ -88,16 +90,25 @@ def write_png(path: Path, width: int, rows: list[bytearray], channels: int) -> N
     path.write_bytes(png)
 
 
+def parse_size(raw: str) -> tuple[int, int]:
+    """«1024» → квадрат, «1590x400» → прямоугольник."""
+    if "x" in raw:
+        width, height = raw.split("x", 1)
+        return int(width), int(height)
+    side = int(raw)
+    return side, side
+
+
 def main() -> int:
     svg = Path(sys.argv[1]).resolve()
     out = Path(sys.argv[2]).resolve()
-    size = int(sys.argv[3]) if len(sys.argv) > 3 else 1024
+    want_width, want_height = parse_size(sys.argv[3]) if len(sys.argv) > 3 else (1024, 1024)
 
     page = svg.with_name("_render.html")
     page.write_text(
         "<!doctype html><meta charset='utf-8'>"
         "<style>html,body{margin:0;padding:0}"
-        f"img{{position:fixed;top:0;left:0;width:{size}px;height:{size}px;display:block}}</style>"
+        f"img{{position:fixed;top:0;left:0;width:{want_width}px;height:{want_height}px;display:block}}</style>"
         f"<img src='{svg.name}'>",
         encoding="utf-8",
     )
@@ -107,21 +118,21 @@ def main() -> int:
             [
                 CHROME, "--headless", "--no-sandbox", "--disable-gpu", "--hide-scrollbars",
                 f"--screenshot={shot}",
-                f"--window-size={size},{size + CHROME_VIEWPORT_OFFSET}",
+                f"--window-size={want_width},{want_height + CHROME_VIEWPORT_OFFSET}",
                 page.as_uri(),
             ],
             check=True, capture_output=True,
         )
         width, height, channels, rows = read_png(shot.read_bytes())
-        if width != size or height < size:
+        if width != want_width or height < want_height:
             print(f"неожиданный снимок {width}x{height}", file=sys.stderr)
             return 1
-        write_png(out, width, rows[:size], channels)
+        write_png(out, width, rows[:want_height], channels)
     finally:
         page.unlink(missing_ok=True)
         shot.unlink(missing_ok=True)
 
-    print(f"{out} — {size}x{size}")
+    print(f"{out} — {want_width}x{want_height}")
     return 0
 
 
