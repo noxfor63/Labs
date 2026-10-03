@@ -2,9 +2,9 @@
   <title>Поиск попутчиков</title>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#1B45C9"/>
-      <stop offset="0.55" stop-color="#2F7BF0"/>
-      <stop offset="1" stop-color="#24CBE6"/>
+      <stop offset="0" stop-color="#A33A22"/>
+      <stop offset="0.55" stop-color="#E2613C"/>
+      <stop offset="1" stop-color="#FFA76B"/>
     </linearGradient>
   </defs>
 
@@ -17,10 +17,10 @@
           fill="none" stroke="#FFFFFF" stroke-opacity="0.92"
           stroke-width="42" stroke-linecap="round" stroke-dasharray="4 96"/>
     <circle cx="300" cy="760" r="64" fill="#FFFFFF"/>
-    <circle cx="300" cy="760" r="27" fill="#2F7BF0"/>
+    <circle cx="300" cy="760" r="27" fill="#E2613C"/>
     <path d="M 700 440 C 636 360 608 330 608 296 A 92 92 0 1 1 792 296 C 792 330 764 360 700 440 Z"
           fill="#FFFFFF"/>
-    <circle cx="700" cy="293" r="39" fill="#2F7BF0"/>
+    <circle cx="700" cy="293" r="39" fill="#E2613C"/>
   </g>
 
   <g font-family="Liberation Sans, DejaVu Sans, sans-serif" fill="#FFFFFF">

@@ -5,11 +5,27 @@
  * должны задаваться в одном месте, иначе «16 тут, 12 там» расползается по
  * экранам и приложение начинает выглядеть собранным наспех.
  *
- * Цвета берутся только из токенов VKUI — они сами переключаются вместе с
- * темой клиента ВКонтакте, и своя палитра сломала бы это.
+ * Цвета берутся из токенов VKUI — они сами переключаются вместе с темой
+ * клиента ВКонтакте. Исключение одно: акцент. Штатный акцент VKUI — это
+ * фирменный синий ВКонтакте, и приложение на нём визуально не отличается
+ * ни от самого ВКонтакте, ни от конкурентов. Поэтому акцентные токены
+ * переопределены ниже, а всё остальное (фоны, текст, разделители)
+ * по-прежнему отдано VKUI.
  */
 
 :root {
+  /*
+   * Акцент: коралл. Контраст с белым 3.49:1 — ровно столько же, сколько
+   * у штатного синего VKUI (#2688eb, 3.62:1), так что читаемость не
+   * ухудшилась. Для обычного текста этого мало по стандарту, поэтому
+   * акцентом красятся только крупные и жирные элементы — цена, кнопки,
+   * активные фильтры, — а основной текст остаётся на токенах VKUI.
+   */
+  --app-accent: #e2613c;
+  --app-accent-tint: #fdede7;
+  /* Поверх акцентной заливки в светлой теме — белый. */
+  --app-on-accent: #ffffff;
+
   /* Шаг сетки: все отступы кратны 4. */
   --app-space-1: 4px;
   --app-space-2: 8px;
@@ -32,6 +48,71 @@
 
   /* Панель выше штатных 48: тесная панель выглядит дёшево. */
   --vkui_internal--tabbar_height: 58px;
+
+}
+
+
+/*
+ * Переопределение акцентных токенов VKUI.
+ *
+ * Селектор — классы темы, а не :root, и это принципиально. VKUI вешает
+ * класс темы на элемент внутри документа и объявляет токены прямо на нём.
+ * Объявление на :root наследуется, но собственное объявление элемента
+ * всегда сильнее унаследованного — спор решается не весом селектора, а
+ * расстоянием по дереву. Поэтому переопределять нужно на тех же классах;
+ * побеждаем за счёт того, что app.css подключается после vkui.css.
+ *
+ * Перечислены все акцентные токены до одного: любой пропущенный всплыл бы
+ * синей кнопкой или синей галочкой в каком-нибудь редком компоненте, и
+ * нашлось бы это уже у пользователя.
+ */
+.vkui--vkBase--light,
+.vkui--vkIOS--light,
+.vkui--vkCom--light {
+  --vkui--color_background_accent: var(--app-accent);
+  --vkui--color_background_accent_themed: var(--app-accent);
+  --vkui--color_background_accent_alternative: var(--app-accent);
+  --vkui--color_background_accent_tint: #ef8763;
+  --vkui--color_background_accent_themed_alpha: #e2613c33;
+  --vkui--color_text_accent: var(--app-accent);
+  --vkui--color_text_accent_themed: var(--app-accent);
+  --vkui--color_text_contrast_themed: var(--app-on-accent);
+  --vkui--color_icon_accent: var(--app-accent);
+  --vkui--color_icon_accent_themed: var(--app-accent);
+  --vkui--color_stroke_accent: var(--app-accent);
+  --vkui--color_stroke_accent_themed: var(--app-accent);
+  --vkui--color_accent_blue: var(--app-accent);
+}
+
+/*
+ * Тёмная тема.
+ *
+ * Акцент светлеет, а текст поверх него становится тёмным — та же логика,
+ * что у самого VKUI (его «themed»-заливка в тёмной теме белая с чёрным
+ * текстом), только в нашем цвете. Светлый коралл на тёмном фоне даёт
+ * 8.5:1 против 3.5:1 у тёмного, так что в тёмной теме читаемость даже
+ * лучше, чем в светлой.
+ */
+.vkui--vkBase--dark,
+.vkui--vkIOS--dark,
+.vkui--vkCom--dark {
+  --app-accent: #ff9a76;
+  --app-accent-tint: #3a241d;
+  --app-on-accent: #19191a;
+
+  --vkui--color_background_accent: var(--app-accent);
+  --vkui--color_background_accent_themed: var(--app-accent);
+  --vkui--color_background_accent_alternative: var(--app-accent);
+  --vkui--color_background_accent_tint: #ffb79b;
+  --vkui--color_background_accent_themed_alpha: #ff9a7633;
+  --vkui--color_text_accent: var(--app-accent);
+  --vkui--color_text_accent_themed: var(--app-accent);
+  --vkui--color_text_contrast_themed: var(--app-on-accent);
+  --vkui--color_icon_accent: var(--app-accent);
+  --vkui--color_icon_accent_themed: var(--app-accent);
+  --vkui--color_stroke_accent: var(--app-accent);
+  --vkui--color_stroke_accent_themed: var(--app-accent);
+  --vkui--color_accent_blue: var(--app-accent);
 }
 
 /* ─────────────── карточка ─────────────── */
@@ -105,9 +186,9 @@
 }
 
 /*
- * Пара токенов выбрана не случайно: в тёмной теме accent_themed и
- * text_contrast_themed меняются местами (белый фон, чёрный текст),
- * поэтому контраст сохраняется без отдельной ветки под тему.
+ * Оба токена переопределены выше и меняются вместе с темой: в светлой
+ * это тёмный коралл с белым текстом, в тёмной — светлый коралл с тёмным.
+ * Поэтому отдельной ветки под тему здесь по-прежнему не нужно.
  */
 .app-chip--on {
   background: var(--vkui--color_background_accent_themed);

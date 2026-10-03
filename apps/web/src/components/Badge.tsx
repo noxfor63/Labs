@@ -21,7 +21,9 @@ const TONE_STYLE: Record<BadgeTone, CSSProperties> = {
     color: 'var(--vkui--color_text_positive)',
   },
   accent: {
-    background: 'var(--vkui--color_background_secondary)',
+    // Тёплая подложка, а не серая: рядом стоит «positive» на своей
+    // подложке, и на сером фоне акцентный ярлык выглядел бы случайным.
+    background: 'var(--app-accent-tint)',
     color: 'var(--vkui--color_text_accent_themed)',
   },
   negative: {

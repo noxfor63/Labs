@@ -24,13 +24,13 @@ FPS = 60
 TOTAL = 100
 
 WHITE = [1, 1, 1, 1]
-BLUE = [47 / 255, 123 / 255, 240 / 255, 1]
+ACCENT = [0xE2 / 255, 0x61 / 255, 0x3C / 255, 1]
 
 # Градиент фона — те же три цвета, что в SVG.
 GRADIENT = [
-    (0.00, (0x1B, 0x45, 0xC9)),
-    (0.55, (0x2F, 0x7B, 0xF0)),
-    (1.00, (0x24, 0xCB, 0xE6)),
+    (0.00, (0xA3, 0x3A, 0x22)),
+    (0.55, (0xE2, 0x61, 0x3C)),
+    (1.00, (0xFF, 0xA7, 0x6B)),
 ]
 
 
@@ -238,7 +238,7 @@ def build() -> dict:
 
     # Метка назначения появляется последней — к ней ведёт маршрут.
     layers.append(
-        shape_layer(index, "metka", [ellipse(r(78), BLUE), pin_path()], p(700, 296), 54)
+        shape_layer(index, "metka", [ellipse(r(78), ACCENT), pin_path()], p(700, 296), 54)
     )
     index += 1
 
@@ -251,7 +251,7 @@ def build() -> dict:
         shape_layer(
             index,
             "nachalo",
-            [ellipse(r(54), BLUE), ellipse(r(128), WHITE)],
+            [ellipse(r(54), ACCENT), ellipse(r(128), WHITE)],
             p(300, 760),
             0,
         )
