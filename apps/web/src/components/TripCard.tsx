@@ -106,12 +106,14 @@ export function TripCard({
           </Headline>
         </div>
 
-        {/* Цена — токеном accent_blue, а не accent_themed: второй в тёмной
-            теме равен #fff, и цена там сливалась с остальным текстом. */}
+        {/* Цена — акцентом. Берётся через --app-accent, а не через
+            accent_themed: второй используется как заливка, и текст им
+            красить нельзя — в тёмной теме он задуман светлым под тёмную
+            надпись, а здесь нужен ровно наоборот. */}
         <Headline
           level="1"
           weight="2"
-          style={{ whiteSpace: 'nowrap', color: 'var(--vkui--color_accent_blue)' }}
+          style={{ whiteSpace: 'nowrap', color: 'var(--app-accent)' }}
         >
           {formatPrice(trip.priceRub)}
         </Headline>

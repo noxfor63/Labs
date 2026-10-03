@@ -199,7 +199,7 @@ export function TripPanel({ id, view }: { id: string; view: string }): ReactNode
               <Headline
                 level="1"
                 weight="1"
-                style={{ color: 'var(--vkui--color_accent_blue)' }}
+                style={{ color: 'var(--app-accent)' }}
               >
                 {formatPrice(trip.priceRub)}
               </Headline>

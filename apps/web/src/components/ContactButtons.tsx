@@ -25,7 +25,21 @@ export function ContactButtons({ user }: { user: UserPublic }): ReactNode {
           size="l"
           mode="secondary"
           stretched
-          before={<Icon20LogoVk width={20} height={20} />}
+          before={
+            /*
+             * Цвет логотипа ВКонтакте закреплён явно. Иконка рисуется
+             * currentColor, то есть по умолчанию берёт цвет кнопки, а он
+             * у нас коралловый — и фирменный знак чужого бренда
+             * перекрашивался в наш акцент. Токен accent_azure — это
+             * синий ВКонтакте (#07f), и он не входит в набор акцентных,
+             * которые мы переопределяем.
+             */
+            <Icon20LogoVk
+              width={20}
+              height={20}
+              style={{ color: 'var(--vkui--color_accent_azure)' }}
+            />
+          }
           href={buildProfileUrl(user.vkUserId)}
           target="_blank"
           rel="noreferrer"
