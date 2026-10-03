@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1590 400" width="1590" height="400" role="img" aria-label="Поиск попутчиков — Оренбург, Соль-Илецк, Акбулак">
-  <title>Поиск попутчиков</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1590 400" width="1590" height="400" role="img" aria-label="По пути — поиск попутчиков — Оренбург, Соль-Илецк, Акбулак">
+  <title>По пути</title>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#A33A22"/>
@@ -13,8 +13,9 @@
   <!-- Текст держится в левой половине: площадка может обрезать обложку
        по краям, и название не должно попасть под обрез. -->
   <g font-family="Liberation Sans, DejaVu Sans, sans-serif" fill="#FFFFFF">
-    <text x="96" y="196" font-size="86" font-weight="bold" letter-spacing="-1">Поиск попутчиков</text>
-    <text x="100" y="262" font-size="36" fill-opacity="0.82">Оренбург · Соль-Илецк · Акбулак</text>
+    <text x="96" y="186" font-size="104" font-weight="bold" letter-spacing="-2">По пути</text>
+    <text x="100" y="238" font-size="40" fill-opacity="0.95">Поиск попутчиков</text>
+    <text x="100" y="292" font-size="34" fill-opacity="0.78">Оренбург · Соль-Илецк · Акбулак</text>
   </g>
 
   <!-- Тот же знак, что на аватарке, в уменьшенном виде: обложка и иконка

@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 630" width="1120" height="630" role="img" aria-label="Поиск попутчиков — Оренбург, Соль-Илецк, Акбулак">
-  <title>Поиск попутчиков</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 630" width="1120" height="630" role="img" aria-label="По пути — поиск попутчиков: Оренбург, Соль-Илецк, Акбулак">
+  <title>По пути</title>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#A33A22"/>
@@ -24,8 +24,10 @@
   </g>
 
   <g font-family="Liberation Sans, DejaVu Sans, sans-serif" fill="#FFFFFF">
-    <text x="470" y="290" font-size="76" font-weight="bold" letter-spacing="-1">Поиск</text>
-    <text x="470" y="372" font-size="76" font-weight="bold" letter-spacing="-1">попутчиков</text>
-    <text x="474" y="436" font-size="31" fill-opacity="0.82">Оренбург · Соль-Илецк · Акбулак</text>
+    <!-- Название короткое, поэтому идёт одной строкой и крупнее прежнего:
+         «По пути» само по себе не объясняет, что это, — пояснение ниже. -->
+    <text x="470" y="300" font-size="98" font-weight="bold" letter-spacing="-2">По пути</text>
+    <text x="474" y="362" font-size="38" fill-opacity="0.95">Поиск попутчиков</text>
+    <text x="474" y="414" font-size="31" fill-opacity="0.78">Оренбург · Соль-Илецк · Акбулак</text>
   </g>
 </svg>
