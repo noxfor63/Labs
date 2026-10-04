@@ -74,6 +74,12 @@ const envSchema = z
     VK_APP_ID: z.coerce.number().int().positive().optional(),
     VK_APP_SECRET: z.string().default(''),
     VK_MOCK_LAUNCH_PARAMS: z.string().default(''),
+    /**
+     * Токен бота Telegram. Он же ключ проверки подписи initData, поэтому
+     * без него площадка просто выключена: запросы с заголовком Telegram
+     * получают 401, приложение ВКонтакте работает как работало.
+     */
+    TELEGRAM_BOT_TOKEN: z.string().default(''),
   })
   .transform((raw) => {
     const isProduction = raw.NODE_ENV === 'production';
@@ -91,6 +97,8 @@ const envSchema = z
        * значение всегда пустое, чем бы ни было забито окружение.
        */
       mockLaunchParams: isProduction ? '' : raw.VK_MOCK_LAUNCH_PARAMS,
+      /** Включена ли площадка Telegram. */
+      telegramEnabled: raw.TELEGRAM_BOT_TOKEN !== '',
     };
   })
   .refine((value) => !value.isProduction || value.VK_APP_SECRET.length > 0, {

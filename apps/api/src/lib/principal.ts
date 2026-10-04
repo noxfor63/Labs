@@ -24,6 +24,16 @@ export type Principal = {
   platform: Platform;
   /** Идентификатор на площадке: vk_user_id либо telegram id. */
   platformUserId: bigint;
+  /**
+   * Профиль, пришедший **подписанным** вместе с идентификатором.
+   * Есть только у Telegram: он кладёт имя и фото прямо в initData. У
+   * ВКонтакте их в launch-параметрах нет, и фронтенд присылает их телом.
+   */
+  profile?: {
+    firstName: string;
+    lastName: string;
+    photoUrl: string | null;
+  };
 };
 
 /** Колонка, в которой лежит идентификатор этой площадки. */

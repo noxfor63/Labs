@@ -15,11 +15,13 @@ import { buildApp } from '../src/app.js';
 import { createPrismaClient } from '../src/db.js';
 import { parseEnv, type AppEnv } from '../src/env.js';
 import { signLaunchParams } from '../src/lib/launch-params.js';
+import { signInitData } from '../src/lib/telegram-init-data.js';
 import type { RateLimitConfig } from '../src/routes/types.js';
 import { TEST_DATABASE_URL } from './global-setup.js';
 
 export const TEST_SECRET = 'test-secret-not-a-real-vk-key';
 export const TEST_APP_ID = '51234567';
+export const TEST_BOT_TOKEN = '7000000000:AAFakeTokenForTestsOnly';
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
@@ -34,6 +36,7 @@ export function makeEnv(overrides: Record<string, string> = {}): AppEnv {
     VK_APP_ID: TEST_APP_ID,
     VK_APP_SECRET: TEST_SECRET,
     VK_MOCK_LAUNCH_PARAMS: '',
+    TELEGRAM_BOT_TOKEN: TEST_BOT_TOKEN,
     ...overrides,
   });
 }
@@ -67,6 +70,37 @@ export async function createTestApp(
       await prisma.$disconnect();
     },
   };
+}
+
+/* ───────────────────── заголовок Telegram ───────────────────── */
+
+export type TelegramUserFixture = {
+  id: number | bigint;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  photo_url?: string;
+};
+
+/** initData, подписанный тестовым токеном бота, — как его прислал бы клиент. */
+export function telegramInitData(
+  user: TelegramUserFixture,
+  options: { authDate?: number; botToken?: string } = {},
+): string {
+  const params = new URLSearchParams({
+    auth_date: String(options.authDate ?? Math.floor(Date.now() / 1000)),
+    query_id: 'AAEtest',
+    user: JSON.stringify({ first_name: 'Тест', last_name: 'Телеграмов', ...user }),
+  });
+  params.set('hash', signInitData(params, options.botToken ?? TEST_BOT_TOKEN));
+  return params.toString();
+}
+
+export function telegramHeaders(
+  user: TelegramUserFixture,
+  options: { authDate?: number; botToken?: string } = {},
+): Record<string, string> {
+  return { 'x-telegram-init-data': telegramInitData(user, options) };
 }
 
 /* ───────────────────── launch-параметры ───────────────────── */

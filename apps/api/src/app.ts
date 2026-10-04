@@ -67,8 +67,16 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await fastify.register(rateLimit, {
     // Лимит включается точечно на пишущих маршрутах через config.rateLimit.
     global: false,
-    // Ключ — пользователь ВКонтакте, если он уже проверен, иначе IP.
-    keyGenerator: (request) => request.vk?.vkUserId?.toString() ?? request.ip,
+    /*
+     * Ключ — площадка и идентификатор на ней, если запрос уже проверен,
+     * иначе IP. Площадка в ключе обязательна: нумерация у ВКонтакте и
+     * Telegram своя, и без неё двое разных людей с одинаковым числовым
+     * идентификатором делили бы один лимит.
+     */
+    keyGenerator: (request) =>
+      request.principal === undefined
+        ? request.ip
+        : `${request.principal.platform}:${request.principal.platformUserId}`,
   });
 
   fastify.setErrorHandler((error, request, reply) => {

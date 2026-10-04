@@ -37,6 +37,14 @@ export const sessionRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlu
         const body = parseWith(sessionBodySchema, request.body ?? {});
         const principal = request.principal;
 
+        /*
+         * Подписанный профиль площадки важнее присланного телом: Telegram
+         * кладёт имя и фото прямо в initData, и подделать их нельзя, а
+         * тело запроса — можно. У ВКонтакте подписанного профиля нет,
+         * поэтому там всё остаётся как было.
+         */
+        const signed = principal.profile;
+
         // В update попадают только присланные поля — то, чего клиент не знает,
         // остаётся как было.
         const update: {
@@ -46,14 +54,20 @@ export const sessionRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlu
           city?: string | null;
           phone?: string | null;
         } = {};
-        if (body.firstName !== undefined) {
-          update.firstName = body.firstName;
-        }
-        if (body.lastName !== undefined) {
-          update.lastName = body.lastName;
-        }
-        if (body.photoUrl !== undefined) {
-          update.photoUrl = body.photoUrl ?? null;
+        if (signed !== undefined) {
+          update.firstName = signed.firstName;
+          update.lastName = signed.lastName;
+          update.photoUrl = signed.photoUrl;
+        } else {
+          if (body.firstName !== undefined) {
+            update.firstName = body.firstName;
+          }
+          if (body.lastName !== undefined) {
+            update.lastName = body.lastName;
+          }
+          if (body.photoUrl !== undefined) {
+            update.photoUrl = body.photoUrl ?? null;
+          }
         }
         if (body.city !== undefined) {
           update.city = body.city ?? null;
@@ -71,9 +85,9 @@ export const sessionRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlu
           where: principalWhere(principal),
           create: {
             ...principalWhere(principal),
-            firstName: body.firstName ?? 'Пользователь',
-            lastName: body.lastName ?? '',
-            photoUrl: body.photoUrl ?? null,
+            firstName: signed?.firstName ?? body.firstName ?? 'Пользователь',
+            lastName: signed?.lastName ?? body.lastName ?? '',
+            photoUrl: signed?.photoUrl ?? body.photoUrl ?? null,
             city: body.city ?? null,
             phone: body.phone ?? null,
           },

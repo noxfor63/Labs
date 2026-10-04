@@ -42,8 +42,11 @@ export const REQUEST_STATUSES = [
   REQUEST_STATUS.CANCELLED,
 ] as const;
 
-/** Заголовок, которым фронтенд передаёт исходную query-строку запуска. */
+/** Заголовок, которым фронтенд ВКонтакте передаёт исходную query-строку запуска. */
 export const LAUNCH_PARAMS_HEADER = 'x-launch-params';
+
+/** Заголовок, которым фронтенд Telegram передаёт initData как есть. */
+export const TELEGRAM_INIT_DATA_HEADER = 'x-telegram-init-data';
 
 /** Launch-параметры старше суток считаются протухшими. */
 export const LAUNCH_PARAMS_MAX_AGE_SECONDS = 24 * 60 * 60;
