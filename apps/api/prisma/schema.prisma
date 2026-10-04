@@ -1,8 +1,8 @@
-// Схема БД мини-приложения «Поиск попутчиков».
+// Схема БД мини-приложения «По пути».
 //
 // Все денежные значения — целые рубли. Все временные метки — UTC.
-// vkUserId — первичный ключ пользователя: он же приходит в launch-параметрах,
-// поэтому суррогатный id здесь только мешал бы.
+// Пользователь опознаётся суррогатным id, а идентификаторы площадок
+// (ВКонтакте, Telegram) лежат отдельными колонками — см. модель User.
 
 generator client {
   provider = "prisma-client-js"
@@ -35,9 +35,22 @@ enum RequestStatus {
   CANCELLED
 }
 
-/// Кэш профиля из ВКонтакте. Обновляется на каждом POST /api/session.
+/// Человек, независимо от площадки, через которую он пришёл.
+///
+/// Первичный ключ суррогатный, а не идентификатор площадки. Так сделано
+/// потому, что один и тот же человек может прийти из ВКонтакте, из
+/// Telegram или из обоих сразу, и привязка строки к одной площадке
+/// закрывала бы дорогу остальным. Идентификаторы площадок лежат
+/// отдельными необязательными колонками: заполнена хотя бы одна.
+///
+/// Профиль (имя, фото, город) кэшируется с той площадки, через которую
+/// человек вошёл в последний раз, и обновляется на каждом POST /api/session.
 model User {
-  vkUserId    BigInt   @id
+  id          String   @id @default(cuid())
+  /// Идентификатор ВКонтакте. Пусто у тех, кто пришёл только из Telegram.
+  vkUserId    BigInt?  @unique
+  /// Идентификатор Telegram. Пусто у тех, кто пришёл только из ВКонтакте.
+  tgUserId    BigInt?  @unique
   firstName   String
   lastName    String
   photoUrl    String?
@@ -59,7 +72,7 @@ model User {
 
 model Trip {
   id         String     @id @default(cuid())
-  authorVkId BigInt
+  authorId   String
   role       TripRole
   fromCity   String
   fromPoint  String?
@@ -76,13 +89,13 @@ model Trip {
   status     TripStatus @default(ACTIVE)
   createdAt  DateTime   @default(now())
 
-  author   User          @relation("TripAuthor", fields: [authorVkId], references: [vkUserId], onDelete: Cascade)
+  author   User          @relation("TripAuthor", fields: [authorId], references: [id], onDelete: Cascade)
   requests TripRequest[]
   reviews  Review[]
 
   @@index([fromCity, toCity, departAt])
   @@index([status])
-  @@index([authorVkId, status])
+  @@index([authorId, status])
   @@index([departAt, id])
   @@map("trips")
 }
@@ -90,34 +103,34 @@ model Trip {
 model TripRequest {
   id        String        @id @default(cuid())
   tripId    String
-  userVkId  BigInt
+  userId    String
   status    RequestStatus @default(PENDING)
   message   String?
   createdAt DateTime      @default(now())
 
   trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userVkId], references: [vkUserId], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([tripId, userVkId])
-  @@index([userVkId, status])
+  @@unique([tripId, userId])
+  @@index([userId, status])
   @@map("trip_requests")
 }
 
 model Review {
   id         String   @id @default(cuid())
   tripId     String
-  authorVkId BigInt
-  targetVkId BigInt
+  authorId   String
+  targetId   String
   /// 1..5 — проверяется Zod-схемой на входе.
   rating     Int
   text       String?
   createdAt  DateTime @default(now())
 
   trip   Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  author User @relation("ReviewAuthor", fields: [authorVkId], references: [vkUserId], onDelete: Cascade)
-  target User @relation("ReviewTarget", fields: [targetVkId], references: [vkUserId], onDelete: Cascade)
+  author User @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  target User @relation("ReviewTarget", fields: [targetId], references: [id], onDelete: Cascade)
 
-  @@unique([tripId, authorVkId, targetVkId])
-  @@index([targetVkId])
+  @@unique([tripId, authorId, targetId])
+  @@index([targetId])
   @@map("reviews")
 }

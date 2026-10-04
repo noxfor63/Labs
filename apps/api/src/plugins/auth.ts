@@ -1,9 +1,14 @@
 /**
- * Аутентификация по launch-параметрам ВКонтакте.
+ * Аутентификация запроса.
  *
- * Фронтенд кладёт исходную query-строку запуска в заголовок X-Launch-Params
- * при каждом запросе. Хук проверяет подпись и свежесть на каждом запросе —
- * сессий и куки нет намеренно: состояние на бэкенде не нужно.
+ * Площадка опознаётся по заголовку: X-Launch-Params — ВКонтакте. Хук
+ * проверяет подпись и свежесть на каждом запросе; сессий и куки нет
+ * намеренно — состояние на бэкенде не нужно.
+ *
+ * В базу хук не ходит: он устанавливает только то, что следует из
+ * подписи, — площадку и идентификатор на ней. Сопоставление с
+ * пользователем приложения делают маршруты через requireUserId, потому
+ * что самому частому запросу — ленте поездок — личность не нужна.
  */
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
@@ -18,11 +23,14 @@ import {
   verifyLaunchParams,
   type VerifiedLaunchParams,
 } from '../lib/launch-params.js';
+import { PLATFORM, type Principal } from '../lib/principal.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
     /** Заполняется хуком авторизации; до него обращаться нельзя. */
     vk: VerifiedLaunchParams;
+    /** Площадка и идентификатор на ней. Заполняется тем же хуком. */
+    principal: Principal;
   }
 }
 
@@ -53,11 +61,16 @@ const plugin: FastifyPluginAsync<AuthPluginOptions> = async (fastify, options) =
   // Значение проставляет хук ниже; декоратор нужен, чтобы форма объекта
   // request была одинаковой для всех запросов.
   fastify.decorateRequest('vk', undefined as unknown as VerifiedLaunchParams);
+  fastify.decorateRequest('principal', undefined as unknown as Principal);
 
   fastify.addHook('preHandler', async (request) => {
     const rawQuery = readLaunchParams(request, env);
     try {
       request.vk = verifyLaunchParams(rawQuery, env.VK_APP_SECRET);
+      request.principal = {
+        platform: PLATFORM.VK,
+        platformUserId: request.vk.vkUserId,
+      };
     } catch (error) {
       if (error instanceof LaunchParamsError) {
         // Причину отдаём клиенту: она не раскрывает ключ и помогает отладке.

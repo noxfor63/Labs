@@ -13,32 +13,34 @@ import { parseWith } from '../lib/validate.js';
 import type { RouteDeps } from './types.js';
 
 const paramsSchema = z.object({
-  vkUserId: z.string().regex(/^\d{1,19}$/, 'Некорректный идентификатор пользователя'),
+  // Внутренний идентификатор, а не идентификатор площадки: профиль один,
+  // с какой бы площадки человек ни пришёл.
+  userId: z.string().min(1, 'Некорректный идентификатор пользователя'),
 });
 
 export const userRoutes = ({ prisma }: RouteDeps): FastifyPluginAsync => {
   return async (fastify) => {
-    fastify.get('/users/:vkUserId', async (request): Promise<UserProfileResponse> => {
+    fastify.get('/users/:userId', async (request): Promise<UserProfileResponse> => {
       const params = parseWith(paramsSchema, request.params);
-      const vkUserId = BigInt(params.vkUserId);
+      const userId = params.userId;
 
-      const user = await prisma.user.findUnique({ where: { vkUserId } });
+      const user = await prisma.user.findUnique({ where: { id: userId } });
       if (user === null) {
         throw notFound('Пользователь не найден');
       }
 
       // Завершённая поездка засчитывается и автору, и принятому пассажиру.
       const [asAuthor, asParticipant, reviews] = await Promise.all([
-        prisma.trip.count({ where: { authorVkId: vkUserId, status: TRIP_STATUS.COMPLETED } }),
+        prisma.trip.count({ where: { authorId: userId, status: TRIP_STATUS.COMPLETED } }),
         prisma.tripRequest.count({
           where: {
-            userVkId: vkUserId,
+            userId,
             status: REQUEST_STATUS.ACCEPTED,
             trip: { status: TRIP_STATUS.COMPLETED },
           },
         }),
         prisma.review.findMany({
-          where: { targetVkId: vkUserId },
+          where: { targetId: userId },
           orderBy: { createdAt: 'desc' },
           take: 50,
           include: { author: true, target: true },

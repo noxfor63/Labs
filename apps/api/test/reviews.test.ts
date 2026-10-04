@@ -5,7 +5,8 @@ import {
   authHeaders,
   createTestApp,
   createTrip,
-  createUser,
+  createUsers,
+  type UserIds,
   type TestContext,
 } from './helpers.js';
 
@@ -17,37 +18,37 @@ const STRANGER = 5_300_004n;
 describe('POST /api/reviews', () => {
   let ctx: TestContext;
 
+  let users: UserIds;
+
   beforeAll(async () => {
     ctx = await createTestApp();
-    for (const vkUserId of [DRIVER, RIDER, OTHER_RIDER, STRANGER]) {
-      await createUser(ctx.prisma, vkUserId);
-    }
+    users = await createUsers(ctx.prisma, [DRIVER, RIDER, OTHER_RIDER, STRANGER]);
   });
 
   afterAll(async () => {
-    const people = [DRIVER, RIDER, OTHER_RIDER, STRANGER];
-    await ctx.prisma.review.deleteMany({ where: { authorVkId: { in: people } } });
-    await ctx.prisma.tripRequest.deleteMany({ where: { userVkId: { in: people } } });
-    await ctx.prisma.trip.deleteMany({ where: { authorVkId: { in: people } } });
-    await ctx.prisma.user.deleteMany({ where: { vkUserId: { in: people } } });
+    const people = users.all;
+    await ctx.prisma.review.deleteMany({ where: { authorId: { in: people } } });
+    await ctx.prisma.tripRequest.deleteMany({ where: { userId: { in: people } } });
+    await ctx.prisma.trip.deleteMany({ where: { authorId: { in: people } } });
+    await ctx.prisma.user.deleteMany({ where: { id: { in: people } } });
     await ctx.close();
   });
 
   /** Завершённая поездка, в которой RIDER — принятый пассажир. */
   const completedTrip = async (): Promise<string> => {
     const tripId = await createTrip(ctx.prisma, {
-      authorVkId: DRIVER,
+      authorId: users.id(DRIVER),
       seatsTotal: 3,
       seatsLeft: 2,
       status: 'COMPLETED',
       departAt: new Date(Date.now() - 2 * DAY),
     });
     await ctx.prisma.tripRequest.create({
-      data: { tripId, userVkId: RIDER, status: 'ACCEPTED' },
+      data: { tripId, userId: users.id(RIDER), status: 'ACCEPTED' },
     });
     // Отклонённый пассажир участником не считается.
     await ctx.prisma.tripRequest.create({
-      data: { tripId, userVkId: OTHER_RIDER, status: 'DECLINED' },
+      data: { tripId, userId: users.id(OTHER_RIDER), status: 'DECLINED' },
     });
     return tripId;
   };
@@ -68,7 +69,7 @@ describe('POST /api/reviews', () => {
 
     const response = await postReview(RIDER, {
       tripId,
-      targetVkId: DRIVER.toString(),
+      targetId: users.id(DRIVER),
       rating: 5,
       text: 'Доехали спокойно и вовремя.',
     });
@@ -88,7 +89,7 @@ describe('POST /api/reviews', () => {
     const secondTripId = await completedTrip();
     const second = await postReview(RIDER, {
       tripId: secondTripId,
-      targetVkId: DRIVER.toString(),
+      targetId: users.id(DRIVER),
       rating: 3,
     });
     expect(second.statusCode).toBe(201);
@@ -99,14 +100,14 @@ describe('POST /api/reviews', () => {
   });
 
   it('по незавершённой поездке отзыв оставить нельзя', async () => {
-    const tripId = await createTrip(ctx.prisma, { authorVkId: DRIVER, seatsTotal: 2 });
+    const tripId = await createTrip(ctx.prisma, { authorId: users.id(DRIVER), seatsTotal: 2 });
     await ctx.prisma.tripRequest.create({
-      data: { tripId, userVkId: RIDER, status: 'ACCEPTED' },
+      data: { tripId, userId: users.id(RIDER), status: 'ACCEPTED' },
     });
 
     const response = await postReview(RIDER, {
       tripId,
-      targetVkId: DRIVER.toString(),
+      targetId: users.id(DRIVER),
       rating: 5,
     });
 
@@ -117,16 +118,16 @@ describe('POST /api/reviews', () => {
 
   it('по отменённой поездке отзыв оставить нельзя', async () => {
     const tripId = await createTrip(ctx.prisma, {
-      authorVkId: DRIVER,
+      authorId: users.id(DRIVER),
       status: 'CANCELLED',
     });
     await ctx.prisma.tripRequest.create({
-      data: { tripId, userVkId: RIDER, status: 'ACCEPTED' },
+      data: { tripId, userId: users.id(RIDER), status: 'ACCEPTED' },
     });
 
     const response = await postReview(RIDER, {
       tripId,
-      targetVkId: DRIVER.toString(),
+      targetId: users.id(DRIVER),
       rating: 4,
     });
 
@@ -139,20 +140,20 @@ describe('POST /api/reviews', () => {
 
     const first = await postReview(RIDER, {
       tripId,
-      targetVkId: DRIVER.toString(),
+      targetId: users.id(DRIVER),
       rating: 5,
     });
     expect(first.statusCode).toBe(201);
 
     const second = await postReview(RIDER, {
       tripId,
-      targetVkId: DRIVER.toString(),
+      targetId: users.id(DRIVER),
       rating: 1,
     });
 
     expect(second.statusCode).toBe(409);
     expect(second.json()).toMatchObject({ error: { code: 'ALREADY_REVIEWED' } });
-    expect(await ctx.prisma.review.count({ where: { tripId, authorVkId: RIDER } })).toBe(1);
+    expect(await ctx.prisma.review.count({ where: { tripId, authorId: users.id(RIDER) } })).toBe(1);
   });
 
   it('не участник поездки отзыв оставить не может', async () => {
@@ -160,7 +161,7 @@ describe('POST /api/reviews', () => {
 
     const response = await postReview(STRANGER, {
       tripId,
-      targetVkId: DRIVER.toString(),
+      targetId: users.id(DRIVER),
       rating: 5,
     });
 
@@ -173,7 +174,7 @@ describe('POST /api/reviews', () => {
 
     const response = await postReview(OTHER_RIDER, {
       tripId,
-      targetVkId: DRIVER.toString(),
+      targetId: users.id(DRIVER),
       rating: 5,
     });
 
@@ -186,7 +187,7 @@ describe('POST /api/reviews', () => {
 
     const response = await postReview(RIDER, {
       tripId,
-      targetVkId: STRANGER.toString(),
+      targetId: users.id(STRANGER),
       rating: 5,
     });
 
@@ -199,7 +200,7 @@ describe('POST /api/reviews', () => {
 
     const response = await postReview(DRIVER, {
       tripId,
-      targetVkId: DRIVER.toString(),
+      targetId: users.id(DRIVER),
       rating: 5,
     });
 
@@ -213,7 +214,7 @@ describe('POST /api/reviews', () => {
     for (const rating of [0, 6, -1]) {
       const response = await postReview(RIDER, {
         tripId,
-        targetVkId: DRIVER.toString(),
+        targetId: users.id(DRIVER),
         rating,
       });
       expect(response.statusCode).toBe(400);
@@ -223,11 +224,11 @@ describe('POST /api/reviews', () => {
 
   it('профиль отдаёт рейтинг, завершённые поездки и отзывы', async () => {
     const tripId = await completedTrip();
-    await postReview(RIDER, { tripId, targetVkId: DRIVER.toString(), rating: 5 });
+    await postReview(RIDER, { tripId, targetId: users.id(DRIVER), rating: 5 });
 
     const response = await ctx.app.inject({
       method: 'GET',
-      url: `/api/users/${DRIVER}`,
+      url: `/api/users/${users.id(DRIVER)}`,
       headers: authHeaders(RIDER),
     });
 

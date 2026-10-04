@@ -5,8 +5,10 @@
  * фронтенд берёт отсюда типы и парсит ответы. Одна схема — один источник
  * правды, иначе формы и API разъезжаются на первом же рефакторинге.
  *
- * vkUserId во всех JSON — строка: BigInt не переживает JSON.stringify,
- * а number теряет точность на больших id.
+ * Идентификаторы площадок (vkUserId, tgUserId) во всех JSON — строки:
+ * BigInt не переживает JSON.stringify, а number теряет точность на
+ * больших id. Собственный id пользователя — тоже строка, но уже потому,
+ * что это cuid.
  */
 import { z } from 'zod';
 
@@ -23,9 +25,13 @@ import { DEPART_STEP_MINUTES, isAllowedDepartTime } from './schedule.js';
 
 /* ──────────────────────────── примитивы ──────────────────────────── */
 
-export const vkUserIdSchema = z
+/** Идентификатор пользователя внутри приложения, он же cuid. */
+export const userIdSchema = z.string().min(1, 'Нужен идентификатор пользователя');
+
+/** Идентификатор на внешней площадке — ВКонтакте или Telegram. */
+export const platformUserIdSchema = z
   .string()
-  .regex(/^\d{1,19}$/, 'vk_user_id должен быть целым числом');
+  .regex(/^\d{1,19}$/, 'Идентификатор площадки должен быть целым числом');
 
 export const cityNameSchema = z
   .string()
@@ -85,7 +91,14 @@ export const phoneInputSchema = z
   });
 
 export const userPublicSchema = z.object({
-  vkUserId: vkUserIdSchema,
+  id: userIdSchema,
+  /**
+   * Идентификаторы площадок. Нужны фронтенду, чтобы собрать ссылку на
+   * профиль: для ВКонтакте это vk.com/id<N>, для Telegram — t.me. У
+   * человека заполнен хотя бы один, но не обязательно оба.
+   */
+  vkUserId: platformUserIdSchema.nullable(),
+  tgUserId: platformUserIdSchema.nullable(),
   firstName: z.string(),
   lastName: z.string(),
   photoUrl: z.string().nullable(),
@@ -255,7 +268,7 @@ export const myRequestsQuerySchema = z.object({
 
 export const createReviewSchema = z.object({
   tripId: z.string().min(1),
-  targetVkId: vkUserIdSchema,
+  targetId: userIdSchema,
   rating: z.coerce.number().int().min(LIMITS.RATING_MIN).max(LIMITS.RATING_MAX),
   text: optionalText(LIMITS.REVIEW_TEXT_MAX),
 });
@@ -286,6 +299,6 @@ export const reviewableParticipantSchema = z.object({
   trip: tripSummarySchema,
   participants: z.array(userPublicSchema),
   /** Кому текущий пользователь уже поставил оценку по этой поездке. */
-  alreadyReviewedVkIds: z.array(vkUserIdSchema),
+  alreadyReviewedUserIds: z.array(userIdSchema),
 });
 export type ReviewableParticipants = z.infer<typeof reviewableParticipantSchema>;

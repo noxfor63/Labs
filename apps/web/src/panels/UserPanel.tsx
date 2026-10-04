@@ -27,13 +27,13 @@ import { useAsync } from '../lib/useAsync.js';
 export function UserPanel({ id, view }: { id: string; view: string }): ReactNode {
   const routeNavigator = useRouteNavigator();
   const { view: activeView, panel: activePanel } = useActiveVkuiLocation();
-  const params = useParams<'vkUserId'>();
-  const vkUserId = params?.vkUserId ?? '';
-  const isActive = activeView === view && activePanel === id && vkUserId !== '';
+  const params = useParams<'userId'>();
+  const userId = params?.userId ?? '';
+  const isActive = activeView === view && activePanel === id && userId !== '';
 
   const loader = useCallback(
-    (signal: AbortSignal) => api.getUser(vkUserId, signal),
-    [vkUserId],
+    (signal: AbortSignal) => api.getUser(userId, signal),
+    [userId],
   );
   const { data, isLoading, error, reload } = useAsync(loader, { enabled: isActive });
 

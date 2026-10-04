@@ -10,6 +10,7 @@ import {
 } from '@vk-rideshare/shared';
 
 import { conflict, forbidden, notFound } from '../lib/errors.js';
+import { requireUserId } from '../lib/principal.js';
 import { toTripRequest } from '../lib/serializers.js';
 import { parseWith } from '../lib/validate.js';
 import type { RouteDeps } from './types.js';
@@ -24,7 +25,7 @@ export const requestRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlu
       async (request): Promise<TripRequestDto> => {
         const { id } = parseWith(idParamSchema, request.params);
         const input = parseWith(patchTripRequestSchema, request.body ?? {});
-        const viewerVkId = request.vk.vkUserId;
+        const viewerId = await requireUserId(prisma, request.principal);
 
         return prisma.$transaction(async (tx) => {
           const existing = await tx.tripRequest.findUnique({
@@ -34,7 +35,7 @@ export const requestRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlu
           if (existing === null) {
             throw notFound('Отклик не найден');
           }
-          if (existing.trip.authorVkId !== viewerVkId) {
+          if (existing.trip.authorId !== viewerId) {
             throw forbidden('Принимать и отклонять отклики может только автор поездки');
           }
           if (existing.status !== REQUEST_STATUS.PENDING) {

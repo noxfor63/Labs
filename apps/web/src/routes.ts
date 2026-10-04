@@ -30,17 +30,17 @@ export const MODAL = {
 export const routes: RouteWithoutRoot[] = [
   { path: '/', view: VIEW.SEARCH, panel: PANEL.SEARCH },
   { path: '/trip/:tripId', view: VIEW.SEARCH, panel: PANEL.TRIP },
-  { path: '/user/:vkUserId', view: VIEW.SEARCH, panel: PANEL.USER },
+  { path: '/user/:userId', view: VIEW.SEARCH, panel: PANEL.USER },
 
   { path: '/create', view: VIEW.CREATE, panel: PANEL.CREATE },
 
   { path: '/my', view: VIEW.MY, panel: PANEL.MY },
   { path: '/my/trip/:tripId', view: VIEW.MY, panel: PANEL.TRIP },
-  { path: '/my/user/:vkUserId', view: VIEW.MY, panel: PANEL.USER },
+  { path: '/my/user/:userId', view: VIEW.MY, panel: PANEL.USER },
   { path: '/my/review/:tripId', view: VIEW.MY, panel: PANEL.MY, modal: MODAL.REVIEW },
 
   { path: '/profile', view: VIEW.PROFILE, panel: PANEL.PROFILE },
-  { path: '/profile/user/:vkUserId', view: VIEW.PROFILE, panel: PANEL.USER },
+  { path: '/profile/user/:userId', view: VIEW.PROFILE, panel: PANEL.USER },
 ];
 
 export const router = createHashRouter(routes);

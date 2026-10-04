@@ -38,7 +38,7 @@ export function ReviewModal({ id }: { id: string }): ReactNode {
   // ModalRoot держит все модалки в дереве; грузим данные только у открытой.
   const isActive = activeModal === id && tripId !== '';
 
-  const [targetVkId, setTargetVkId] = useState<string | null>(null);
+  const [targetId, setTargetId] = useState<string | null>(null);
   const [rating, setRating] = useState<string>('5');
   const [text, setText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -50,14 +50,14 @@ export function ReviewModal({ id }: { id: string }): ReactNode {
   const { data, isLoading, error, reload } = useAsync(loader, { enabled: isActive });
 
   const submit = async (): Promise<void> => {
-    if (targetVkId === null) {
+    if (targetId === null) {
       return;
     }
     setIsSubmitting(true);
     try {
       await api.createReview({
         tripId,
-        targetVkId,
+        targetId,
         rating: Number(rating),
         text: text.trim() === '' ? null : text.trim(),
       });
@@ -95,7 +95,7 @@ export function ReviewModal({ id }: { id: string }): ReactNode {
   }
 
   const pending = data.participants.filter(
-    (participant) => !data.alreadyReviewedVkIds.includes(participant.vkUserId),
+    (participant) => !data.alreadyReviewedUserIds.includes(participant.id),
   );
 
   if (pending.length === 0) {
@@ -117,14 +117,14 @@ export function ReviewModal({ id }: { id: string }): ReactNode {
       <FormItem top="Кому оставляете отзыв">
         {pending.map((participant) => (
           <SimpleCell
-            key={participant.vkUserId}
+            key={participant.id}
             before={<Avatar size={40} src={participant.photoUrl ?? undefined} />}
-            subtitle={participant.vkUserId === targetVkId ? 'Выбран' : undefined}
+            subtitle={participant.id === targetId ? 'Выбран' : undefined}
             onClick={() => {
-              setTargetVkId(participant.vkUserId);
+              setTargetId(participant.id);
             }}
             style={
-              participant.vkUserId === targetVkId
+              participant.id === targetId
                 ? { background: 'var(--vkui--color_background_secondary)' }
                 : undefined
             }
@@ -160,12 +160,12 @@ export function ReviewModal({ id }: { id: string }): ReactNode {
           size="l"
           stretched
           loading={isSubmitting}
-          disabled={isSubmitting || targetVkId === null}
+          disabled={isSubmitting || targetId === null}
           onClick={() => {
             void submit();
           }}
         >
-          {targetVkId === null ? 'Выберите попутчика' : 'Отправить отзыв'}
+          {targetId === null ? 'Выберите попутчика' : 'Отправить отзыв'}
         </Button>
       </Div>
       <Spacing size={8} />

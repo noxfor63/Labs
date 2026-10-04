@@ -11,7 +11,7 @@ export function UserProfileBody({
   onOpenUser,
 }: {
   profile: UserProfileResponse;
-  onOpenUser?: (vkUserId: string) => void;
+  onOpenUser?: (userId: string) => void;
 }): ReactNode {
   return (
     <>
@@ -56,7 +56,7 @@ export function UserProfileBody({
                 ? {}
                 : {
                     onClick: () => {
-                      onOpenUser(review.author.vkUserId);
+                      onOpenUser(review.author.id);
                     },
                   })}
             >

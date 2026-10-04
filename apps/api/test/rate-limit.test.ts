@@ -6,16 +6,17 @@ const AUTHOR = 5_500_001n;
 
 describe('rate limit на запись', () => {
   let ctx: TestContext;
+  let authorId: string;
 
   beforeAll(async () => {
     // Порог опущен до 2 запросов в минуту: проверяем механизм, а не цифру.
     ctx = await createTestApp({ rateLimit: { max: 2, timeWindow: '1 minute' } });
-    await createUser(ctx.prisma, AUTHOR);
+    authorId = await createUser(ctx.prisma, AUTHOR);
   });
 
   afterAll(async () => {
-    await ctx.prisma.trip.deleteMany({ where: { authorVkId: AUTHOR } });
-    await ctx.prisma.user.deleteMany({ where: { vkUserId: AUTHOR } });
+    await ctx.prisma.trip.deleteMany({ where: { authorId } });
+    await ctx.prisma.user.deleteMany({ where: { id: authorId } });
     await ctx.close();
   });
 

@@ -19,7 +19,12 @@ import {
 
 export function toUserPublic(user: User): UserPublic {
   return {
-    vkUserId: user.vkUserId.toString(),
+    id: user.id,
+    // Идентификаторы площадок необязательные: у пришедшего только из
+    // Telegram нет vkUserId, и наоборот. Фронтенд по ним решает, какие
+    // кнопки связи показывать.
+    vkUserId: user.vkUserId === null ? null : user.vkUserId.toString(),
+    tgUserId: user.tgUserId === null ? null : user.tgUserId.toString(),
     firstName: user.firstName,
     lastName: user.lastName,
     photoUrl: user.photoUrl,
@@ -99,18 +104,18 @@ export function toReview(review: ReviewWithPeople): ReviewDto {
 export type TripDetailParts = {
   trip: TripWithAuthor;
   requests: RequestWithUser[];
-  viewerVkId: bigint;
+  viewerId: string;
   canReview: boolean;
 };
 
 export function toTripDetail({
   trip,
   requests,
-  viewerVkId,
+  viewerId,
   canReview,
 }: TripDetailParts): TripDetail {
-  const isAuthor = trip.authorVkId === viewerVkId;
-  const mine = requests.find((request) => request.userVkId === viewerVkId);
+  const isAuthor = trip.authorId === viewerId;
+  const mine = requests.find((request) => request.userId === viewerId);
 
   return {
     ...toTripSummary(trip),

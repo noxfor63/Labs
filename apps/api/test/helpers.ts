@@ -113,12 +113,18 @@ export function allocateVkIds(count: number, base: number): bigint[] {
   return Array.from({ length: count }, (_, index) => BigInt(start + index));
 }
 
+/**
+ * Заводит пользователя по идентификатору ВКонтакте и возвращает его
+ * **внутренний** id — именно он теперь стоит во внешних ключах. Сам
+ * vkUserId остаётся нужен для заголовка запуска, поэтому вызывающий
+ * держит оба: один для авторизации, другой для связей.
+ */
 export async function createUser(
   prisma: PrismaClient,
   vkUserId: bigint,
   overrides: { firstName?: string; lastName?: string } = {},
-): Promise<bigint> {
-  await prisma.user.upsert({
+): Promise<string> {
+  const user = await prisma.user.upsert({
     where: { vkUserId },
     create: {
       vkUserId,
@@ -126,12 +132,49 @@ export async function createUser(
       lastName: overrides.lastName ?? 'Тестов',
     },
     update: {},
+    select: { id: true },
   });
-  return vkUserId;
+  return user.id;
+}
+
+/**
+ * Пачка пользователей и обратное соответствие «идентификатор ВКонтакте →
+ * внутренний id».
+ *
+ * Нужно потому, что в тестах эти два идентификатора нужны одновременно и
+ * для разного: по первому собирается заголовок запуска, по второму стоят
+ * внешние ключи. Без такого соответствия каждый тест заводил бы себе по
+ * переменной на каждого участника.
+ */
+export type UserIds = {
+  /** Внутренний id по идентификатору ВКонтакте. */
+  id: (vkUserId: bigint) => string;
+  /** Все внутренние id — для подчистки за тестом. */
+  all: string[];
+};
+
+export async function createUsers(
+  prisma: PrismaClient,
+  vkUserIds: readonly bigint[],
+): Promise<UserIds> {
+  const map = new Map<bigint, string>();
+  for (const vkUserId of vkUserIds) {
+    map.set(vkUserId, await createUser(prisma, vkUserId));
+  }
+  return {
+    id: (vkUserId) => {
+      const internal = map.get(vkUserId);
+      if (internal === undefined) {
+        throw new Error(`Пользователь ${vkUserId} в этом тесте не заводился`);
+      }
+      return internal;
+    },
+    all: [...map.values()],
+  };
 }
 
 export type TripFixture = {
-  authorVkId: bigint;
+  authorId: string;
   seatsTotal?: number;
   seatsLeft?: number;
   status?: TripStatus;
@@ -149,7 +192,7 @@ export async function createTrip(
   const seatsTotal = fixture.seatsTotal ?? 3;
   const trip = await prisma.trip.create({
     data: {
-      authorVkId: fixture.authorVkId,
+      authorId: fixture.authorId,
       role: fixture.role ?? TRIP_ROLE.DRIVER,
       fromCity: fixture.fromCity ?? ORENBURG,
       toCity: fixture.toCity ?? SOL_ILETSK,

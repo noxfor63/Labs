@@ -15,28 +15,32 @@ const RIDERS = [5_200_002n, 5_200_003n, 5_200_004n, 5_200_005n, 5_200_006n] as c
 
 describe('гонка за последним местом', () => {
   let ctx: TestContext;
+  // Идентификатор ВКонтакте нужен для заголовка запуска, внутренний — для
+  // внешних ключей. Это разные вещи, и держать их приходится отдельно.
+  let authorId: string;
+  const riderIds = new Map<bigint, string>();
 
   beforeAll(async () => {
     ctx = await createTestApp();
-    await createUser(ctx.prisma, AUTHOR);
+    authorId = await createUser(ctx.prisma, AUTHOR);
     for (const rider of RIDERS) {
-      await createUser(ctx.prisma, rider);
+      riderIds.set(rider, await createUser(ctx.prisma, rider));
     }
   });
 
   afterAll(async () => {
-    await ctx.prisma.tripRequest.deleteMany({ where: { userVkId: { in: [...RIDERS] } } });
-    await ctx.prisma.trip.deleteMany({ where: { authorVkId: AUTHOR } });
+    await ctx.prisma.tripRequest.deleteMany({ where: { userId: { in: [...riderIds.values()] } } });
+    await ctx.prisma.trip.deleteMany({ where: { authorId } });
     await ctx.prisma.user.deleteMany({ where: { vkUserId: { in: [AUTHOR, ...RIDERS] } } });
     await ctx.close();
   });
 
   const setup = async (seatsTotal: number, riders: readonly bigint[]) => {
-    const tripId = await createTrip(ctx.prisma, { authorVkId: AUTHOR, seatsTotal });
+    const tripId = await createTrip(ctx.prisma, { authorId, seatsTotal });
     const requestIds: string[] = [];
     for (const rider of riders) {
       const created = await ctx.prisma.tripRequest.create({
-        data: { tripId, userVkId: rider },
+        data: { tripId, userId: riderIds.get(rider)! },
       });
       requestIds.push(created.id);
     }

@@ -47,17 +47,22 @@ const DAY = 24 * HOUR;
 
 /* ─────────────────── исходные данные ─────────────────── */
 
+/**
+ * Внутренние id заданы явно и предсказуемо, а не отданы на откуп cuid:
+ * сид переиспользуется в отладке и скриншотах, и ссылки вида
+ * /user/seed-user-2 должны оставаться теми же между прогонами.
+ */
 const PEOPLE = [
-  { vkUserId: 1_000_001n, firstName: 'Анна', lastName: 'Ковалёва', city: ORENBURG },
-  { vkUserId: 1_000_002n, firstName: 'Дмитрий', lastName: 'Соколов', city: SOL_ILETSK },
-  { vkUserId: 1_000_003n, firstName: 'Мария', lastName: 'Егорова', city: AKBULAK },
-  { vkUserId: 1_000_004n, firstName: 'Игорь', lastName: 'Верещагин', city: ORENBURG },
-  { vkUserId: 1_000_005n, firstName: 'Ольга', lastName: 'Панкратова', city: SOL_ILETSK },
-  { vkUserId: 1_000_006n, firstName: 'Тимур', lastName: 'Гаязов', city: AKBULAK },
-  { vkUserId: 1_000_007n, firstName: 'Светлана', lastName: 'Юрченко', city: ORENBURG },
-  { vkUserId: 1_000_008n, firstName: 'Никита', lastName: 'Бортников', city: SOL_ILETSK },
-  { vkUserId: 1_000_009n, firstName: 'Алина', lastName: 'Мещерякова', city: AKBULAK },
-  { vkUserId: 1_000_010n, firstName: 'Павел', lastName: 'Стрельцов', city: ORENBURG },
+  { id: 'seed-user-1', vkUserId: 1_000_001n, firstName: 'Анна', lastName: 'Ковалёва', city: ORENBURG },
+  { id: 'seed-user-2', vkUserId: 1_000_002n, firstName: 'Дмитрий', lastName: 'Соколов', city: SOL_ILETSK },
+  { id: 'seed-user-3', vkUserId: 1_000_003n, firstName: 'Мария', lastName: 'Егорова', city: AKBULAK },
+  { id: 'seed-user-4', vkUserId: 1_000_004n, firstName: 'Игорь', lastName: 'Верещагин', city: ORENBURG },
+  { id: 'seed-user-5', vkUserId: 1_000_005n, firstName: 'Ольга', lastName: 'Панкратова', city: SOL_ILETSK },
+  { id: 'seed-user-6', vkUserId: 1_000_006n, firstName: 'Тимур', lastName: 'Гаязов', city: AKBULAK },
+  { id: 'seed-user-7', vkUserId: 1_000_007n, firstName: 'Светлана', lastName: 'Юрченко', city: ORENBURG },
+  { id: 'seed-user-8', vkUserId: 1_000_008n, firstName: 'Никита', lastName: 'Бортников', city: SOL_ILETSK },
+  { id: 'seed-user-9', vkUserId: 1_000_009n, firstName: 'Алина', lastName: 'Мещерякова', city: AKBULAK },
+  { id: 'seed-user-10', vkUserId: 1_000_010n, firstName: 'Павел', lastName: 'Стрельцов', city: ORENBURG },
 ] as const;
 
 /**
@@ -154,6 +159,7 @@ async function main(prisma: PrismaClient): Promise<void> {
 
   await prisma.user.createMany({
     data: PEOPLE.map((person, index) => ({
+      id: person.id,
       vkUserId: person.vkUserId,
       firstName: person.firstName,
       lastName: person.lastName,
@@ -201,7 +207,7 @@ async function main(prisma: PrismaClient): Promise<void> {
     activeCount += 1;
     tripRows.push({
       id: `seed-active-${activeCount}`,
-      authorVkId: author.vkUserId,
+      authorId: author.id,
       role: isDriver ? 'DRIVER' : 'PASSENGER',
       fromCity: route.from,
       toCity: route.to,
@@ -223,7 +229,7 @@ async function main(prisma: PrismaClient): Promise<void> {
     const seatsTotal = int(2, 4);
     tripRows.push({
       id: `seed-completed-${index + 1}`,
-      authorVkId: author.vkUserId,
+      authorId: author.id,
       role: 'DRIVER',
       fromCity: route.from,
       toCity: route.to,
@@ -245,7 +251,7 @@ async function main(prisma: PrismaClient): Promise<void> {
     const seatsTotal = int(1, 3);
     tripRows.push({
       id: `seed-cancelled-${index + 1}`,
-      authorVkId: author.vkUserId,
+      authorId: author.id,
       role: 'DRIVER',
       fromCity: route.from,
       toCity: route.to,
@@ -279,21 +285,21 @@ async function main(prisma: PrismaClient): Promise<void> {
   const requestRows: Prisma.TripRequestCreateManyInput[] = [];
   const acceptedSeats = new Map<string, number>();
   /** tripId → участники (автор + принятые), нужно для отзывов. */
-  const participants = new Map<string, bigint[]>();
+  const participants = new Map<string, string[]>();
 
   for (const trip of tripRows) {
-    const candidates = PEOPLE.filter((person) => person.vkUserId !== trip.authorVkId);
+    const candidates = PEOPLE.filter((person) => person.id !== trip.authorId);
     const wanted = trip.status === 'COMPLETED' ? int(2, 3) : int(0, 3);
-    const chosen: bigint[] = [];
+    const chosen: string[] = [];
     for (let i = 0; i < wanted; i += 1) {
-      const candidate = pick(candidates).vkUserId;
+      const candidate = pick(candidates).id;
       if (!chosen.includes(candidate)) {
         chosen.push(candidate);
       }
     }
 
-    const accepted: bigint[] = [];
-    for (const userVkId of chosen) {
+    const accepted: string[] = [];
+    for (const userId of chosen) {
       const seatsUsed = acceptedSeats.get(trip.id!) ?? 0;
       const seatsFree = trip.seatsTotal - seatsUsed;
 
@@ -312,19 +318,19 @@ async function main(prisma: PrismaClient): Promise<void> {
 
       if (status === 'ACCEPTED') {
         acceptedSeats.set(trip.id!, seatsUsed + 1);
-        accepted.push(userVkId);
+        accepted.push(userId);
       }
 
       requestRows.push({
         tripId: trip.id!,
-        userVkId,
+        userId,
         status,
         message: chance(0.75) ? pick(REQUEST_MESSAGES) : null,
         createdAt: new Date(now - int(1, 72) * HOUR),
       });
     }
 
-    participants.set(trip.id!, [trip.authorVkId as bigint, ...accepted]);
+    participants.set(trip.id!, [trip.authorId as string, ...accepted]);
   }
 
   await prisma.tripRequest.createMany({ data: requestRows });
@@ -347,21 +353,21 @@ async function main(prisma: PrismaClient): Promise<void> {
       continue;
     }
     const people = participants.get(trip.id!) ?? [];
-    for (const authorVkId of people) {
-      for (const targetVkId of people) {
-        if (authorVkId === targetVkId || !chance(0.65)) {
+    for (const authorId of people) {
+      for (const targetId of people) {
+        if (authorId === targetId || !chance(0.65)) {
           continue;
         }
         const rating = chance(0.75) ? 5 : int(3, 4);
         reviewRows.push({
           tripId: trip.id!,
-          authorVkId,
-          targetVkId,
+          authorId,
+          targetId,
           rating,
           text: chance(0.8) ? pick(REVIEW_TEXTS) : null,
           createdAt: new Date(now - int(1, 20) * DAY),
         });
-        const key = targetVkId.toString();
+        const key = targetId;
         const totals = ratingTotals.get(key) ?? { sum: 0, count: 0 };
         ratingTotals.set(key, { sum: totals.sum + rating, count: totals.count + 1 });
       }
@@ -370,9 +376,9 @@ async function main(prisma: PrismaClient): Promise<void> {
 
   await prisma.review.createMany({ data: reviewRows });
 
-  for (const [vkUserId, totals] of ratingTotals) {
+  for (const [userId, totals] of ratingTotals) {
     await prisma.user.update({
-      where: { vkUserId: BigInt(vkUserId) },
+      where: { id: userId },
       data: {
         ratingCount: totals.count,
         ratingAvg: Math.round((totals.sum / totals.count) * 100) / 100,

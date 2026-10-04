@@ -177,8 +177,8 @@ export const api = {
   createReview: (input: CreateReviewInput): Promise<unknown> =>
     request('/reviews', { method: 'POST', body: input }),
 
-  getUser: (vkUserId: string, signal?: AbortSignal): Promise<UserProfileResponse> =>
-    request(`/users/${encodeURIComponent(vkUserId)}`, {
+  getUser: (userId: string, signal?: AbortSignal): Promise<UserProfileResponse> =>
+    request(`/users/${encodeURIComponent(userId)}`, {
       ...(signal === undefined ? {} : { signal }),
     }),
 };

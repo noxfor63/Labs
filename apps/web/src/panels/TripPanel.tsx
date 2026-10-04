@@ -264,7 +264,7 @@ export function TripPanel({ id, view }: { id: string; view: string }): ReactNode
             />
           }
           onClick={() => {
-            void routeNavigator.push(`${prefix}/user/${trip.author.vkUserId}`);
+            void routeNavigator.push(`${prefix}/user/${trip.author.id}`);
           }}
         >
           {fullName(trip.author)}
@@ -356,7 +356,7 @@ export function TripPanel({ id, view }: { id: string; view: string }): ReactNode
                   )
                 }
                 onClick={() => {
-                  void routeNavigator.push(`${prefix}/user/${request.user.vkUserId}`);
+                  void routeNavigator.push(`${prefix}/user/${request.user.id}`);
                 }}
               >
                 {fullName(request.user)}

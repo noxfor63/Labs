@@ -29,14 +29,14 @@ export function ProfilePanel({ id, view }: { id: string; view: string }): ReactN
   const snackbar = useSnackbar();
   const routeNavigator = useRouteNavigator();
   const { view: activeView } = useActiveVkuiLocation();
-  const vkUserId = session.user?.vkUserId ?? '';
+  const userId = session.user?.id ?? '';
 
   const loader = useCallback(
-    (signal: AbortSignal) => api.getUser(vkUserId, signal),
-    [vkUserId],
+    (signal: AbortSignal) => api.getUser(userId, signal),
+    [userId],
   );
   const { data, isLoading, error, reload } = useAsync(loader, {
-    enabled: activeView === view && vkUserId !== '',
+    enabled: activeView === view && userId !== '',
   });
 
   const savedPhone = session.user?.phone ?? '';

@@ -22,21 +22,22 @@ import { TEST_DATABASE_URL } from './global-setup.js';
 const GRACE_MS = TRIP_EXPIRY_GRACE_MINUTES * 60 * 1000;
 
 let prisma: PrismaClient;
-let authorVkId: bigint;
-let passengerVkId: bigint;
+let authorId: string;
+let passengerId: string;
+let vkIds: bigint[];
 
 beforeAll(async () => {
   prisma = createPrismaClient(TEST_DATABASE_URL);
-  const [author, passenger] = allocateVkIds(2, 7_100_000);
-  authorVkId = await createUser(prisma, author!);
-  passengerVkId = await createUser(prisma, passenger!);
+  vkIds = allocateVkIds(2, 7_100_000);
+  authorId = await createUser(prisma, vkIds[0]!);
+  passengerId = await createUser(prisma, vkIds[1]!);
 });
 
 afterAll(async () => {
-  const people = [authorVkId, passengerVkId];
-  await prisma.tripRequest.deleteMany({ where: { userVkId: { in: people } } });
-  await prisma.trip.deleteMany({ where: { authorVkId: { in: people } } });
-  await prisma.user.deleteMany({ where: { vkUserId: { in: people } } });
+  const people = [authorId, passengerId];
+  await prisma.tripRequest.deleteMany({ where: { userId: { in: people } } });
+  await prisma.trip.deleteMany({ where: { authorId: { in: people } } });
+  await prisma.user.deleteMany({ where: { id: { in: people } } });
   await prisma.$disconnect();
 });
 
@@ -56,7 +57,7 @@ const afterGrace = (departAt: Date): Date => new Date(departAt.getTime() + GRACE
 describe('уборка просроченных поездок', () => {
   it('поездку без принятых пассажиров отменяет', async () => {
     const departAt = slot(-10 * HOUR);
-    const tripId = await createTrip(prisma, { authorVkId, departAt });
+    const tripId = await createTrip(prisma, { authorId, departAt });
 
     await sweepExpiredTrips(prisma, { now: afterGrace(departAt) });
 
@@ -66,9 +67,9 @@ describe('уборка просроченных поездок', () => {
 
   it('поездку с принятым пассажиром завершает — чтобы открыть отзывы', async () => {
     const departAt = slot(-10 * HOUR);
-    const tripId = await createTrip(prisma, { authorVkId, departAt });
+    const tripId = await createTrip(prisma, { authorId, departAt });
     await prisma.tripRequest.create({
-      data: { tripId, userVkId: passengerVkId, status: REQUEST_STATUS.ACCEPTED },
+      data: { tripId, userId: passengerId, status: REQUEST_STATUS.ACCEPTED },
     });
 
     await sweepExpiredTrips(prisma, { now: afterGrace(departAt) });
@@ -79,9 +80,9 @@ describe('уборка просроченных поездок', () => {
 
   it('оставшиеся без ответа отклики отменяет, а не отклоняет', async () => {
     const departAt = slot(-10 * HOUR);
-    const tripId = await createTrip(prisma, { authorVkId, departAt });
+    const tripId = await createTrip(prisma, { authorId, departAt });
     const request = await prisma.tripRequest.create({
-      data: { tripId, userVkId: passengerVkId, status: REQUEST_STATUS.PENDING },
+      data: { tripId, userId: passengerId, status: REQUEST_STATUS.PENDING },
     });
 
     await sweepExpiredTrips(prisma, { now: afterGrace(departAt) });
@@ -94,7 +95,7 @@ describe('уборка просроченных поездок', () => {
 
   it('внутри запаса времени поездку не трогает', async () => {
     const departAt = slot(-10 * HOUR);
-    const tripId = await createTrip(prisma, { authorVkId, departAt });
+    const tripId = await createTrip(prisma, { authorId, departAt });
 
     // Выезд уже прошёл, но запас ещё не вышел.
     await sweepExpiredTrips(prisma, {
@@ -107,7 +108,7 @@ describe('уборка просроченных поездок', () => {
 
   it('будущую поездку не трогает', async () => {
     const departAt = slot(10 * HOUR);
-    const tripId = await createTrip(prisma, { authorVkId, departAt });
+    const tripId = await createTrip(prisma, { authorId, departAt });
 
     await sweepExpiredTrips(prisma, { now: new Date() });
 
@@ -118,7 +119,7 @@ describe('уборка просроченных поездок', () => {
   it('не перетирает статус, который автор выставил сам', async () => {
     const departAt = slot(-10 * HOUR);
     const tripId = await createTrip(prisma, {
-      authorVkId,
+      authorId,
       departAt,
       status: TRIP_STATUS.CANCELLED,
     });
@@ -131,7 +132,7 @@ describe('уборка просроченных поездок', () => {
 
   it('повторный проход ничего не находит', async () => {
     const departAt = slot(-10 * HOUR);
-    await createTrip(prisma, { authorVkId, departAt });
+    await createTrip(prisma, { authorId, departAt });
     const now = afterGrace(departAt);
 
     const first = await sweepExpiredTrips(prisma, { now });

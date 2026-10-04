@@ -1,9 +1,13 @@
-import { buildTelUrl, formatPhone, type UserPublic } from '@vk-rideshare/shared';
-import { Icon20LogoVk, Icon20PhoneOutline } from '@vkontakte/icons';
-import { Button, Caption, Div } from '@vkontakte/vkui';
-import type { ReactNode } from 'react';
+import {
+  buildTelUrl,
+  formatPhone,
+  type UserPublic,
+} from "@vk-rideshare/shared";
+import { Icon20LogoVk, Icon20PhoneOutline } from "@vkontakte/icons";
+import { Button, Caption, Div } from "@vkontakte/vkui";
+import type { ReactNode } from "react";
 
-import { buildProfileUrl } from '../vk/bridge.js';
+import { buildProfileUrl } from "../vk/bridge.js";
 
 /**
  * Способы связаться с человеком: страница ВКонтакте и звонок.
@@ -17,35 +21,43 @@ import { buildProfileUrl } from '../vk/bridge.js';
  */
 export function ContactButtons({ user }: { user: UserPublic }): ReactNode {
   const phone = user.phone !== null && user.phone !== '' ? user.phone : null;
+  /*
+   * Страница ВКонтакте есть не у всех: пришедший только из Telegram
+   * собеседник её не имеет. Кнопку в таком случае не показываем вовсе —
+   * по той же причине, по которой нет неактивной «Позвонить».
+   */
+  const vkUserId = user.vkUserId;
 
   return (
     <Div>
       <div style={{ display: 'flex', gap: 8 }}>
-        <Button
-          size="l"
-          mode="secondary"
-          stretched
-          before={
-            /*
-             * Цвет логотипа ВКонтакте закреплён явно. Иконка рисуется
-             * currentColor, то есть по умолчанию берёт цвет кнопки, а он
-             * у нас коралловый — и фирменный знак чужого бренда
-             * перекрашивался в наш акцент. Токен accent_azure — это
-             * синий ВКонтакте (#07f), и он не входит в набор акцентных,
-             * которые мы переопределяем.
-             */
-            <Icon20LogoVk
-              width={20}
-              height={20}
-              style={{ color: 'var(--vkui--color_accent_azure)' }}
-            />
-          }
-          href={buildProfileUrl(user.vkUserId)}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Профиль
-        </Button>
+        {vkUserId !== null && (
+          <Button
+            size="l"
+            mode="secondary"
+            stretched
+            before={
+              /*
+               * Цвет логотипа ВКонтакте закреплён явно. Иконка рисуется
+               * currentColor, то есть по умолчанию берёт цвет кнопки, а он
+               * у нас коралловый — и фирменный знак чужого бренда
+               * перекрашивался в наш акцент. Токен accent_azure — это
+               * синий ВКонтакте (#07f), и он не входит в набор акцентных,
+               * которые мы переопределяем.
+               */
+              <Icon20LogoVk
+                width={20}
+                height={20}
+                style={{ color: 'var(--vkui--color_accent_azure)' }}
+              />
+            }
+            href={buildProfileUrl(vkUserId)}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Профиль
+          </Button>
+        )}
 
         {phone !== null && (
           <Button

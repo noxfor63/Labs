@@ -3,17 +3,18 @@ import { z } from 'zod';
 
 import { phoneInputSchema, type SessionResponse } from '@vk-rideshare/shared';
 
+import { principalWhere } from '../lib/principal.js';
 import { parseWith } from '../lib/validate.js';
 import { toUserPublic } from '../lib/serializers.js';
 import type { RouteDeps } from './types.js';
 
 /**
- * Профиль, который фронтенд получил через VKWebAppGetUserInfo.
+ * Профиль, который фронтенд получил у своей площадки.
  * Бэкенд ему доверяет ровно настолько, насколько доверяет подписи запуска:
- * vkUserId берётся из подписанных launch-параметров, а не из тела.
+ * идентификатор берётся из подписанных параметров, а не из тела.
  *
- * Все поля необязательны: вне фрейма ВКонтакте мост профиль не отдаёт,
- * и затирать уже сохранённое имя заглушкой в таком случае нельзя.
+ * Все поля необязательны: вне фрейма площадки профиль не отдаётся, и
+ * затирать уже сохранённое имя заглушкой в таком случае нельзя.
  */
 const sessionBodySchema = z.object({
   firstName: z.string().trim().min(1).max(100).optional(),
@@ -34,7 +35,7 @@ export const sessionRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlu
       { config: { rateLimit: writeRateLimit } },
       async (request): Promise<SessionResponse> => {
         const body = parseWith(sessionBodySchema, request.body ?? {});
-        const vkUserId = request.vk.vkUserId;
+        const principal = request.principal;
 
         // В update попадают только присланные поля — то, чего клиент не знает,
         // остаётся как было.
@@ -61,10 +62,15 @@ export const sessionRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlu
           update.phone = body.phone;
         }
 
+        /**
+         * Единственное место, где пользователь заводится. Ключ поиска и
+         * колонка при создании — одна и та же, своя для каждой площадки,
+         * поэтому и то и другое собирается из principal.
+         */
         const user = await prisma.user.upsert({
-          where: { vkUserId },
+          where: principalWhere(principal),
           create: {
-            vkUserId,
+            ...principalWhere(principal),
             firstName: body.firstName ?? 'Пользователь',
             lastName: body.lastName ?? '',
             photoUrl: body.photoUrl ?? null,

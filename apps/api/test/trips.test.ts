@@ -16,6 +16,8 @@ import {
   createTestApp,
   createTrip,
   createUser,
+  createUsers,
+  type UserIds,
   type TestContext,
 } from './helpers.js';
 
@@ -29,19 +31,18 @@ const futureIso = (days: number): string =>
 
 describe('POST /api/trips — создание и валидация', () => {
   let ctx: TestContext;
+  let users: UserIds;
 
   beforeAll(async () => {
     ctx = await createTestApp();
-    for (const vkUserId of [AUTHOR, RIDER, OUTSIDER]) {
-      await createUser(ctx.prisma, vkUserId);
-    }
+    users = await createUsers(ctx.prisma, [AUTHOR, RIDER, OUTSIDER]);
   });
 
   afterAll(async () => {
-    const people = [AUTHOR, RIDER, OUTSIDER];
-    await ctx.prisma.tripRequest.deleteMany({ where: { userVkId: { in: people } } });
-    await ctx.prisma.trip.deleteMany({ where: { authorVkId: { in: people } } });
-    await ctx.prisma.user.deleteMany({ where: { vkUserId: { in: people } } });
+    const people = users.all;
+    await ctx.prisma.tripRequest.deleteMany({ where: { userId: { in: people } } });
+    await ctx.prisma.trip.deleteMany({ where: { authorId: { in: people } } });
+    await ctx.prisma.user.deleteMany({ where: { id: { in: people } } });
     await ctx.close();
   });
 
@@ -202,16 +203,17 @@ describe('POST /api/trips — создание и валидация', () => {
 
 describe('GET /api/trips/:id — видимость откликов', () => {
   let ctx: TestContext;
+  let users: UserIds;
   let tripId: string;
 
   beforeAll(async () => {
     ctx = await createTestApp();
-    for (const vkUserId of [AUTHOR, RIDER, OUTSIDER]) {
-      await createUser(ctx.prisma, vkUserId);
-    }
-    tripId = await createTrip(ctx.prisma, { authorVkId: AUTHOR, seatsTotal: 3 });
-    await ctx.prisma.tripRequest.create({ data: { tripId, userVkId: RIDER, message: 'Возьмёте?' } });
-    await ctx.prisma.tripRequest.create({ data: { tripId, userVkId: OUTSIDER } });
+    users = await createUsers(ctx.prisma, [AUTHOR, RIDER, OUTSIDER]);
+    tripId = await createTrip(ctx.prisma, { authorId: users.id(AUTHOR), seatsTotal: 3 });
+    await ctx.prisma.tripRequest.create({
+      data: { tripId, userId: users.id(RIDER), message: 'Возьмёте?' },
+    });
+    await ctx.prisma.tripRequest.create({ data: { tripId, userId: users.id(OUTSIDER) } });
   });
 
   afterAll(async () => {
@@ -251,31 +253,30 @@ describe('GET /api/trips/:id — видимость откликов', () => {
 
   it('посторонний не видит ни чужих откликов, ни своего', async () => {
     const stranger = 5_400_009n;
-    await createUser(ctx.prisma, stranger);
+    const strangerId = await createUser(ctx.prisma, stranger);
 
     const body = (await read(stranger)).json();
 
     expect(body.requests).toHaveLength(0);
     expect(body.myRequest).toBeNull();
 
-    await ctx.prisma.user.delete({ where: { vkUserId: stranger } });
+    await ctx.prisma.user.delete({ where: { id: strangerId } });
   });
 });
 
 describe('PATCH /api/trips/:id и мои разделы', () => {
   let ctx: TestContext;
+  let users: UserIds;
 
   beforeAll(async () => {
     ctx = await createTestApp();
-    for (const vkUserId of [AUTHOR, RIDER]) {
-      await createUser(ctx.prisma, vkUserId);
-    }
+    users = await createUsers(ctx.prisma, [AUTHOR, RIDER]);
   });
 
   afterAll(async () => {
-    await ctx.prisma.tripRequest.deleteMany({ where: { userVkId: { in: [AUTHOR, RIDER] } } });
-    await ctx.prisma.trip.deleteMany({ where: { authorVkId: { in: [AUTHOR, RIDER] } } });
-    await ctx.prisma.user.deleteMany({ where: { vkUserId: { in: [AUTHOR, RIDER] } } });
+    await ctx.prisma.tripRequest.deleteMany({ where: { userId: { in: users.all } } });
+    await ctx.prisma.trip.deleteMany({ where: { authorId: { in: users.all } } });
+    await ctx.prisma.user.deleteMany({ where: { id: { in: users.all } } });
     await ctx.close();
   });
 
@@ -288,7 +289,7 @@ describe('PATCH /api/trips/:id и мои разделы', () => {
     });
 
   it('автор завершает поездку', async () => {
-    const tripId = await createTrip(ctx.prisma, { authorVkId: AUTHOR });
+    const tripId = await createTrip(ctx.prisma, { authorId: users.id(AUTHOR) });
 
     const response = await patch(tripId, AUTHOR, 'COMPLETED');
 
@@ -297,7 +298,7 @@ describe('PATCH /api/trips/:id и мои разделы', () => {
   });
 
   it('не автор получает 403', async () => {
-    const tripId = await createTrip(ctx.prisma, { authorVkId: AUTHOR });
+    const tripId = await createTrip(ctx.prisma, { authorId: users.id(AUTHOR) });
 
     const response = await patch(tripId, RIDER, 'CANCELLED');
 
@@ -306,7 +307,7 @@ describe('PATCH /api/trips/:id и мои разделы', () => {
   });
 
   it('повторная смена статуса — 409', async () => {
-    const tripId = await createTrip(ctx.prisma, { authorVkId: AUTHOR });
+    const tripId = await createTrip(ctx.prisma, { authorId: users.id(AUTHOR) });
 
     expect((await patch(tripId, AUTHOR, 'CANCELLED')).statusCode).toBe(200);
     const second = await patch(tripId, AUTHOR, 'COMPLETED');
@@ -316,14 +317,14 @@ describe('PATCH /api/trips/:id и мои разделы', () => {
   });
 
   it('недопустимый статус — 400', async () => {
-    const tripId = await createTrip(ctx.prisma, { authorVkId: AUTHOR });
+    const tripId = await createTrip(ctx.prisma, { authorId: users.id(AUTHOR) });
     const response = await patch(tripId, AUTHOR, 'ACTIVE');
     expect(response.statusCode).toBe(400);
   });
 
   it('GET /api/me/trips отдаёт только мои объявления', async () => {
-    await createTrip(ctx.prisma, { authorVkId: AUTHOR });
-    await createTrip(ctx.prisma, { authorVkId: RIDER });
+    await createTrip(ctx.prisma, { authorId: users.id(AUTHOR) });
+    await createTrip(ctx.prisma, { authorId: users.id(RIDER) });
 
     const response = await ctx.app.inject({
       method: 'GET',
@@ -338,8 +339,8 @@ describe('PATCH /api/trips/:id и мои разделы', () => {
   });
 
   it('GET /api/me/requests отдаёт мои отклики вместе с поездкой', async () => {
-    const tripId = await createTrip(ctx.prisma, { authorVkId: AUTHOR });
-    await ctx.prisma.tripRequest.create({ data: { tripId, userVkId: RIDER } });
+    const tripId = await createTrip(ctx.prisma, { authorId: users.id(AUTHOR) });
+    await ctx.prisma.tripRequest.create({ data: { tripId, userId: users.id(RIDER) } });
 
     const response = await ctx.app.inject({
       method: 'GET',

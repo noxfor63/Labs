@@ -62,11 +62,15 @@ describe('POST /api/session — номер телефона', () => {
   });
 
   it('номер виден в профиле пользователя', async () => {
-    await session({ firstName: 'Тест', phone: '+79991112233' });
+    // Профиль запрашивается по внутреннему id, а не по идентификатору
+    // ВКонтакте: у человека он один на все площадки. Сам id отдаётся
+    // в ответе на создание сессии.
+    const created = await session({ firstName: 'Тест', phone: '+79991112233' });
+    const userId = created.json().user.id as string;
 
     const response = await ctx.app.inject({
       method: 'GET',
-      url: `/api/users/${VK_USER_ID}`,
+      url: `/api/users/${userId}`,
       headers: authHeaders(VK_USER_ID),
     });
 

@@ -9,6 +9,7 @@ import {
 
 import { ApiError, conflict, notFound } from '../lib/errors.js';
 import { getParticipants, recalculateRating } from '../lib/participants.js';
+import { requireUserId } from '../lib/principal.js';
 import { toReview } from '../lib/serializers.js';
 import { parseWith } from '../lib/validate.js';
 import { isUniqueViolation } from './trips.js';
@@ -21,10 +22,10 @@ export const reviewRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlug
       { config: { rateLimit: writeRateLimit } },
       async (request, reply): Promise<ReviewDto> => {
         const input = parseWith(createReviewSchema, request.body ?? {});
-        const authorVkId = request.vk.vkUserId;
-        const targetVkId = BigInt(input.targetVkId);
+        const authorId = await requireUserId(prisma, request.principal);
+        const targetId = input.targetId;
 
-        if (authorVkId === targetVkId) {
+        if (authorId === targetId) {
           throw conflict(ERROR_CODE.SELF_REVIEW, 'Нельзя оставить отзыв самому себе');
         }
 
@@ -41,14 +42,14 @@ export const reviewRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlug
           }
 
           const info = await getParticipants(tx, input.tripId);
-          if (info === null || !info.participantVkIds.includes(authorVkId)) {
+          if (info === null || !info.participantIds.includes(authorId)) {
             throw new ApiError(
               403,
               ERROR_CODE.NOT_A_PARTICIPANT,
               'Вы не были участником этой поездки',
             );
           }
-          if (!info.participantVkIds.includes(targetVkId)) {
+          if (!info.participantIds.includes(targetId)) {
             throw new ApiError(
               403,
               ERROR_CODE.NOT_A_PARTICIPANT,
@@ -61,8 +62,8 @@ export const reviewRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlug
             created = await tx.review.create({
               data: {
                 tripId: input.tripId,
-                authorVkId,
-                targetVkId,
+                authorId,
+                targetId,
                 rating: input.rating,
                 text: input.text,
               },
@@ -80,7 +81,7 @@ export const reviewRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlug
 
           // Рейтинг пересчитывается той же транзакцией: иначе отзыв и
           // средняя оценка могут разойтись при падении между запросами.
-          await recalculateRating(tx, targetVkId);
+          await recalculateRating(tx, targetId);
 
           return toReview(created);
         });

@@ -19,7 +19,8 @@ import {
 import { decodeCursor, encodeCursor } from '../lib/cursor.js';
 import { conflict, forbidden, notFound, validationFailed } from '../lib/errors.js';
 import { getParticipants } from '../lib/participants.js';
-import { toTripDetail, toTripRequest, toTripSummary } from '../lib/serializers.js';
+import { requireUserId } from '../lib/principal.js';
+import { toTripDetail, toTripRequest, toTripSummary, toUserPublic } from '../lib/serializers.js';
 import { parseWith } from '../lib/validate.js';
 import type { RouteDeps } from './types.js';
 
@@ -109,10 +110,11 @@ export const tripRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlugin
       { config: writeConfig },
       async (request, reply): Promise<TripSummary> => {
         const input = parseWith(createTripSchema, request.body ?? {});
+        const authorId = await requireUserId(prisma, request.principal);
 
         const trip = await prisma.trip.create({
           data: {
-            authorVkId: request.vk.vkUserId,
+            authorId,
             role: input.role,
             fromCity: input.fromCity,
             fromPoint: input.fromPoint,
@@ -137,7 +139,7 @@ export const tripRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlugin
 
     fastify.get('/trips/:id', async (request): Promise<TripDetail> => {
       const { id } = parseWith(idParamSchema, request.params);
-      const viewerVkId = request.vk.vkUserId;
+      const viewerId = await requireUserId(prisma, request.principal);
 
       const trip = await prisma.trip.findUnique({
         where: { id },
@@ -155,15 +157,15 @@ export const tripRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlugin
         const accepted = trip.requests.filter(
           (item) => item.status === REQUEST_STATUS.ACCEPTED,
         );
-        const participantVkIds = [trip.authorVkId, ...accepted.map((item) => item.userVkId)];
-        if (participantVkIds.includes(viewerVkId)) {
+        const participantIds = [trip.authorId, ...accepted.map((item) => item.userId)];
+        if (participantIds.includes(viewerId)) {
           const already = await prisma.review.findMany({
-            where: { tripId: trip.id, authorVkId: viewerVkId },
-            select: { targetVkId: true },
+            where: { tripId: trip.id, authorId: viewerId },
+            select: { targetId: true },
           });
-          const reviewed = new Set(already.map((item) => item.targetVkId.toString()));
-          canReview = participantVkIds.some(
-            (vkId) => vkId !== viewerVkId && !reviewed.has(vkId.toString()),
+          const reviewed = new Set(already.map((item) => item.targetId.toString()));
+          canReview = participantIds.some(
+            (vkId) => vkId !== viewerId && !reviewed.has(vkId.toString()),
           );
         }
       }
@@ -171,7 +173,7 @@ export const tripRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlugin
       return toTripDetail({
         trip,
         requests: trip.requests,
-        viewerVkId,
+        viewerId,
         canReview,
       });
     });
@@ -185,11 +187,12 @@ export const tripRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlugin
         const { id } = parseWith(idParamSchema, request.params);
         const input = parseWith(patchTripSchema, request.body ?? {});
 
+        const viewerId = await requireUserId(prisma, request.principal);
         const existing = await prisma.trip.findUnique({ where: { id } });
         if (existing === null) {
           throw notFound('Поездка не найдена');
         }
-        if (existing.authorVkId !== request.vk.vkUserId) {
+        if (existing.authorId !== viewerId) {
           throw forbidden('Менять статус поездки может только её автор');
         }
         if (existing.status !== TRIP_STATUS.ACTIVE) {
@@ -216,13 +219,13 @@ export const tripRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlugin
       async (request, reply): Promise<TripRequestDto> => {
         const { id } = parseWith(idParamSchema, request.params);
         const input = parseWith(createTripRequestSchema, request.body ?? {});
-        const vkUserId = request.vk.vkUserId;
+        const userId = await requireUserId(prisma, request.principal);
 
         const trip = await prisma.trip.findUnique({ where: { id } });
         if (trip === null) {
           throw notFound('Поездка не найдена');
         }
-        if (trip.authorVkId === vkUserId) {
+        if (trip.authorId === userId) {
           throw conflict(ERROR_CODE.OWN_TRIP, 'Нельзя откликнуться на собственную поездку');
         }
         if (trip.status !== TRIP_STATUS.ACTIVE) {
@@ -236,18 +239,18 @@ export const tripRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlugin
         }
 
         const duplicate = await prisma.tripRequest.findUnique({
-          where: { tripId_userVkId: { tripId: id, userVkId: vkUserId } },
+          where: { tripId_userId: { tripId: id, userId } },
         });
         if (duplicate !== null) {
           throw conflict(ERROR_CODE.ALREADY_REQUESTED, 'Вы уже откликнулись на эту поездку');
         }
 
-        // Уникальный индекс (tripId, userVkId) — последняя защита от гонки
+        // Уникальный индекс (tripId, userId) — последняя защита от гонки
         // между проверкой выше и вставкой.
         let created;
         try {
           created = await prisma.tripRequest.create({
-            data: { tripId: id, userVkId: vkUserId, message: input.message },
+            data: { tripId: id, userId, message: input.message },
             include: { user: true },
           });
         } catch (error) {
@@ -266,7 +269,7 @@ export const tripRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlugin
 
     fastify.get('/trips/:id/reviewable', async (request) => {
       const { id } = parseWith(idParamSchema, request.params);
-      const viewerVkId = request.vk.vkUserId;
+      const viewerId = await requireUserId(prisma, request.principal);
 
       const trip = await prisma.trip.findUnique({ where: { id }, include: { author: true } });
       if (trip === null) {
@@ -280,31 +283,26 @@ export const tripRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlugin
       }
 
       const info = await getParticipants(prisma, id);
-      if (info === null || !info.participantVkIds.includes(viewerVkId)) {
+      if (info === null || !info.participantIds.includes(viewerId)) {
         throw forbidden('Вы не были участником этой поездки');
       }
 
-      const others = info.participantVkIds.filter((vkId) => vkId !== viewerVkId);
+      const others = info.participantIds.filter((participantId) => participantId !== viewerId);
       const [users, already] = await Promise.all([
-        prisma.user.findMany({ where: { vkUserId: { in: others } } }),
+        prisma.user.findMany({ where: { id: { in: others } } }),
         prisma.review.findMany({
-          where: { tripId: id, authorVkId: viewerVkId },
-          select: { targetVkId: true },
+          where: { tripId: id, authorId: viewerId },
+          select: { targetId: true },
         }),
       ]);
 
       return {
         trip: toTripSummary(trip),
-        participants: users.map((user) => ({
-          vkUserId: user.vkUserId.toString(),
-          firstName: user.firstName,
-          lastName: user.lastName,
-          photoUrl: user.photoUrl,
-          city: user.city,
-          ratingAvg: user.ratingAvg,
-          ratingCount: user.ratingCount,
-        })),
-        alreadyReviewedVkIds: already.map((item) => item.targetVkId.toString()),
+        // Тот же сериализатор, что и везде: раньше здесь был руками
+        // собранный объект, и он разъехался бы с UserPublic при первом же
+        // новом поле — что и случилось, когда появились площадки.
+        participants: users.map(toUserPublic),
+        alreadyReviewedUserIds: already.map((item) => item.targetId),
       };
     });
   };

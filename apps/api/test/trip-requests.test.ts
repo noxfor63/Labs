@@ -5,7 +5,8 @@ import {
   authHeaders,
   createTestApp,
   createTrip,
-  createUser,
+  createUsers,
+  type UserIds,
   type TestContext,
 } from './helpers.js';
 
@@ -16,6 +17,7 @@ const RIDER_C = 5_100_004n;
 
 describe('POST /api/trips/:id/requests — правила отклика', () => {
   let ctx: TestContext;
+  let users: UserIds;
 
   const respond = (tripId: string, vkUserId: bigint, message = 'Возьмёте?') =>
     ctx.app.inject({
@@ -27,24 +29,18 @@ describe('POST /api/trips/:id/requests — правила отклика', () =>
 
   beforeAll(async () => {
     ctx = await createTestApp();
-    for (const vkUserId of [AUTHOR, RIDER_A, RIDER_B, RIDER_C]) {
-      await createUser(ctx.prisma, vkUserId);
-    }
+    users = await createUsers(ctx.prisma, [AUTHOR, RIDER_A, RIDER_B, RIDER_C]);
   });
 
   afterAll(async () => {
-    await ctx.prisma.tripRequest.deleteMany({
-      where: { userVkId: { in: [AUTHOR, RIDER_A, RIDER_B, RIDER_C] } },
-    });
-    await ctx.prisma.trip.deleteMany({ where: { authorVkId: AUTHOR } });
-    await ctx.prisma.user.deleteMany({
-      where: { vkUserId: { in: [AUTHOR, RIDER_A, RIDER_B, RIDER_C] } },
-    });
+    await ctx.prisma.tripRequest.deleteMany({ where: { userId: { in: users.all } } });
+    await ctx.prisma.trip.deleteMany({ where: { authorId: users.id(AUTHOR) } });
+    await ctx.prisma.user.deleteMany({ where: { id: { in: users.all } } });
     await ctx.close();
   });
 
   it('обычный отклик создаётся со статусом PENDING', async () => {
-    const tripId = await createTrip(ctx.prisma, { authorVkId: AUTHOR, seatsTotal: 2 });
+    const tripId = await createTrip(ctx.prisma, { authorId: users.id(AUTHOR), seatsTotal: 2 });
 
     const response = await respond(tripId, RIDER_A);
 
@@ -58,7 +54,7 @@ describe('POST /api/trips/:id/requests — правила отклика', () =>
   });
 
   it('на собственную поездку откликнуться нельзя', async () => {
-    const tripId = await createTrip(ctx.prisma, { authorVkId: AUTHOR, seatsTotal: 2 });
+    const tripId = await createTrip(ctx.prisma, { authorId: users.id(AUTHOR), seatsTotal: 2 });
 
     const response = await respond(tripId, AUTHOR);
 
@@ -68,7 +64,7 @@ describe('POST /api/trips/:id/requests — правила отклика', () =>
   });
 
   it('повторный отклик того же человека отклоняется', async () => {
-    const tripId = await createTrip(ctx.prisma, { authorVkId: AUTHOR, seatsTotal: 3 });
+    const tripId = await createTrip(ctx.prisma, { authorId: users.id(AUTHOR), seatsTotal: 3 });
 
     expect((await respond(tripId, RIDER_B)).statusCode).toBe(201);
     const second = await respond(tripId, RIDER_B);
@@ -82,7 +78,7 @@ describe('POST /api/trips/:id/requests — правила отклика', () =>
 
   it('при нуле свободных мест отклик отклоняется', async () => {
     const tripId = await createTrip(ctx.prisma, {
-      authorVkId: AUTHOR,
+      authorId: users.id(AUTHOR),
       seatsTotal: 2,
       seatsLeft: 0,
     });
@@ -96,7 +92,7 @@ describe('POST /api/trips/:id/requests — правила отклика', () =>
 
   it('на отменённую поездку откликнуться нельзя', async () => {
     const tripId = await createTrip(ctx.prisma, {
-      authorVkId: AUTHOR,
+      authorId: users.id(AUTHOR),
       status: 'CANCELLED',
     });
 
@@ -108,7 +104,7 @@ describe('POST /api/trips/:id/requests — правила отклика', () =>
 
   it('на уже состоявшуюся поездку откликнуться нельзя', async () => {
     const tripId = await createTrip(ctx.prisma, {
-      authorVkId: AUTHOR,
+      authorId: users.id(AUTHOR),
       departAt: new Date(Date.now() - DAY),
     });
 
@@ -126,29 +122,24 @@ describe('POST /api/trips/:id/requests — правила отклика', () =>
 
 describe('PATCH /api/requests/:id — принятие и отклонение', () => {
   let ctx: TestContext;
+  let users: UserIds;
 
   beforeAll(async () => {
     ctx = await createTestApp();
-    for (const vkUserId of [AUTHOR, RIDER_A, RIDER_B]) {
-      await createUser(ctx.prisma, vkUserId);
-    }
+    users = await createUsers(ctx.prisma, [AUTHOR, RIDER_A, RIDER_B]);
   });
 
   afterAll(async () => {
-    await ctx.prisma.tripRequest.deleteMany({
-      where: { userVkId: { in: [AUTHOR, RIDER_A, RIDER_B] } },
-    });
-    await ctx.prisma.trip.deleteMany({ where: { authorVkId: AUTHOR } });
-    await ctx.prisma.user.deleteMany({
-      where: { vkUserId: { in: [AUTHOR, RIDER_A, RIDER_B] } },
-    });
+    await ctx.prisma.tripRequest.deleteMany({ where: { userId: { in: users.all } } });
+    await ctx.prisma.trip.deleteMany({ where: { authorId: users.id(AUTHOR) } });
+    await ctx.prisma.user.deleteMany({ where: { id: { in: users.all } } });
     await ctx.close();
   });
 
   const makeRequest = async (seatsTotal = 2): Promise<{ tripId: string; requestId: string }> => {
-    const tripId = await createTrip(ctx.prisma, { authorVkId: AUTHOR, seatsTotal });
+    const tripId = await createTrip(ctx.prisma, { authorId: users.id(AUTHOR), seatsTotal });
     const created = await ctx.prisma.tripRequest.create({
-      data: { tripId, userVkId: RIDER_A, message: null },
+      data: { tripId, userId: users.id(RIDER_A), message: null },
     });
     return { tripId, requestId: created.id };
   };
@@ -226,12 +217,12 @@ describe('PATCH /api/requests/:id — принятие и отклонение',
 
   it('принять отклик при нуле мест нельзя, отклик остаётся PENDING', async () => {
     const tripId = await createTrip(ctx.prisma, {
-      authorVkId: AUTHOR,
+      authorId: users.id(AUTHOR),
       seatsTotal: 1,
       seatsLeft: 0,
     });
     const created = await ctx.prisma.tripRequest.create({
-      data: { tripId, userVkId: RIDER_A },
+      data: { tripId, userId: users.id(RIDER_A) },
     });
 
     const response = await ctx.app.inject({

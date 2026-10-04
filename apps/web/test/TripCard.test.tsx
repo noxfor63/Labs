@@ -24,7 +24,9 @@ const trip = (overrides: Partial<TripSummary> = {}): TripSummary => ({
   isExpired: false,
   createdAt: new Date('2026-09-20T10:00:00.000Z').toISOString(),
   author: {
+    id: 'u-1',
     vkUserId: '1000001',
+    tgUserId: null,
     firstName: 'Анна',
     lastName: 'Ковалёва',
     photoUrl: null,
