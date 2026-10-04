@@ -60,7 +60,13 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await fastify.register(cors, {
     origin: allowedOrigins.length > 0 ? allowedOrigins : false,
     methods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'X-Launch-Params'],
+    /*
+     * Заголовки авторизации обеих площадок. Пропустить здесь новый
+     * заголовок — классическая тихая поломка: сервер его принимает,
+     * тесты через inject проходят, а браузер режет запрос на предполётной
+     * проверке, и в приложении видно только «нет связи с сервером».
+     */
+    allowedHeaders: ['Content-Type', 'X-Launch-Params', 'X-Telegram-Init-Data'],
     maxAge: 600,
   });
 

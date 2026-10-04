@@ -1,12 +1,12 @@
 /**
  * Клиент API.
  *
- * Каждый запрос несёт заголовок X-Launch-Params с исходной query-строкой
- * запуска — бэкенд проверяет её подпись. Защищённый ключ здесь не появляется
- * и появиться не может: он живёт только на бэкенде.
+ * Каждый запрос несёт заголовок авторизации своей площадки: у ВКонтакте
+ * это исходная query-строка запуска, у Telegram — initData. Какой именно,
+ * решает слой площадок; клиенту это знать незачем. Подписи проверяет
+ * бэкенд, секретные ключи сюда не попадают и попасть не могут.
  */
 import {
-  LAUNCH_PARAMS_HEADER,
   type CreateReviewInput,
   type CreateTripInput,
   type MyRequestDto,
@@ -20,7 +20,7 @@ import {
   type UserProfileResponse,
 } from '@vk-rideshare/shared';
 
-import { getLaunchParams } from './launch-params.js';
+import { getPlatform } from '../platform/index.js';
 
 /**
  * VITE_API_BASE_URL из корневого .env, подставленный сборкой
@@ -79,9 +79,7 @@ function buildUrl(path: string, query: RequestOptions['query']): string {
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const headers: Record<string, string> = {
-    [LAUNCH_PARAMS_HEADER]: getLaunchParams(),
-  };
+  const headers: Record<string, string> = { ...getPlatform().authHeaders() };
   if (options.body !== undefined) {
     headers['Content-Type'] = 'application/json';
   }

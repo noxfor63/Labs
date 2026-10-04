@@ -3,7 +3,7 @@ import { Icon16Phone } from '@vkontakte/icons';
 import { Button, FormItem, Input } from '@vkontakte/vkui';
 import { useState, type ReactNode } from 'react';
 
-import { fetchVkPhone, isInsideVk } from '../vk/bridge.js';
+import { getPlatform } from '../platform/index.js';
 
 /**
  * Поле номера телефона с подстановкой из профиля ВКонтакте.
@@ -26,16 +26,18 @@ export function PhoneField({
   const [isFetching, setIsFetching] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
 
-  const pullFromVk = async (): Promise<void> => {
+  const platform = getPlatform();
+
+  const pullFromPlatform = async (): Promise<void> => {
     setIsFetching(true);
     setHint(null);
     try {
-      const raw = await fetchVkPhone();
+      const raw = await platform.fetchPhone();
       if (raw === null) {
-        setHint('ВКонтакте не отдал номер — введите его вручную');
+        setHint(`${platform.title} не отдал номер — введите его вручную`);
         return;
       }
-      // Мост возвращает номер в своём формате, приводим к единому виду.
+      // Площадка возвращает номер в своём формате, приводим к единому виду.
       onChange(normalizePhone(raw) ?? raw);
     } finally {
       setIsFetching(false);
@@ -58,7 +60,14 @@ export function PhoneField({
           onChange(event.target.value);
         }}
       />
-      {isInsideVk() && (
+      {/*
+        Кнопка только там, где площадка умеет отдавать номер. У Telegram
+        это делается через бота и явное согласие в диалоге, из
+        мини-приложения номер не получить — значит и кнопки быть не должно:
+        неактивная кнопка без объяснения раздражает сильнее, чем её
+        отсутствие.
+      */}
+      {platform.id === 'vk' && (
         <Button
           mode="link"
           size="s"
@@ -67,7 +76,7 @@ export function PhoneField({
           disabled={isFetching}
           style={{ marginTop: 8 }}
           onClick={() => {
-            void pullFromVk();
+            void pullFromPlatform();
           }}
         >
           Добавить номер из профиля VK

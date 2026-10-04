@@ -28,7 +28,7 @@ import {
 } from '@vkontakte/vkui';
 import { useState, type ReactNode } from 'react';
 
-import { getLaunchParamsSource, type LaunchParamsSource } from './api/launch-params.js';
+import { getPlatform } from './platform/index.js';
 import { ErrorState } from './components/ErrorState.js';
 import { useSession } from './lib/SessionContext.js';
 import { ReviewModal } from './modals/ReviewModal.js';
@@ -76,19 +76,13 @@ const TABS = [
   },
 ] as const;
 
-/** Человеческое объяснение того, откуда взялись (или не взялись) параметры запуска. */
-const LAUNCH_SOURCE_HINT: Record<LaunchParamsSource, string> = {
-  address: 'Параметры запуска найдены в адресе приложения.',
-  cache: 'В адресе параметров запуска нет, взяты сохранённые с прошлого открытия.',
-  none: 'Параметры запуска не найдены ни в адресе, ни в сохранённых.',
-};
-
 export function App(): ReactNode {
   const { view: activeView = VIEW.SEARCH, panel: activePanel, modal: activeModal } =
     useActiveVkuiLocation();
-  // Снимок на момент запуска: читает адрес и хранилище, поэтому вызывать
-  // его прямо в теле рендера нельзя — значение менялось бы само по себе.
-  const [launchSource] = useState<LaunchParamsSource>(getLaunchParamsSource);
+  // Снимок на момент запуска: подсказка читает адрес и хранилище,
+  // поэтому вызывать её прямо в теле рендера нельзя — значение менялось
+  // бы само по себе.
+  const [launchHint] = useState<string>(() => getPlatform().launchHint());
   const routeNavigator = useRouteNavigator();
   const routerPopout = usePopout();
   const session = useSession();
@@ -144,10 +138,7 @@ export function App(): ReactNode {
                       выглядит одинаково и когда параметров нет в адресе, и когда
                       они есть, но протухли, — а чинится это по-разному.
                     */}
-                    <Footer>
-                      {LAUNCH_SOURCE_HINT[launchSource]}
-                      {' Вне ВКонтакте задайте VK_MOCK_LAUNCH_PARAMS в .env.'}
-                    </Footer>
+                    <Footer>{launchHint}</Footer>
                   </>
                 ) : (
                   <ErrorState error={session.error} onRetry={session.reload} />

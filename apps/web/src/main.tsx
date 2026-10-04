@@ -15,17 +15,18 @@ import './styles/app.css';
 import { App } from './App.js';
 import { SessionProvider } from './lib/SessionContext.js';
 import { SnackbarProvider } from './lib/SnackbarContext.js';
+import { getPlatform } from './platform/index.js';
 import { router } from './routes.js';
-import { initBridge, subscribeColorScheme } from './vk/bridge.js';
 
 function Root(): ReactNode {
-  // Тему берём из ВКонтакте: событие VKWebAppUpdateConfig приходит и при
-  // запуске, и при смене оформления в клиенте.
+  // Тему берёт площадка: у ВКонтакте это событие VKWebAppUpdateConfig,
+  // у Telegram — параметры запуска и событие themeChanged.
   const [colorScheme, setColorScheme] = useState<ColorSchemeType>('light');
 
   useEffect(() => {
-    const unsubscribe = subscribeColorScheme(setColorScheme);
-    void initBridge();
+    const platform = getPlatform();
+    const unsubscribe = platform.subscribeColorScheme(setColorScheme);
+    void platform.init();
     return unsubscribe;
   }, []);
 

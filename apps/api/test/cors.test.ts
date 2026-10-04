@@ -102,3 +102,35 @@ describe('CORS: шаблон без VK_APP_ID', () => {
     }
   });
 });
+
+/**
+ * Предполётная проверка: какие заголовки браузеру разрешено слать.
+ *
+ * Отдельный случай, потому что ловит поломку, которую не видит ни один
+ * тест через inject: там предполётного запроса нет вовсе, и сервер
+ * спокойно принимает заголовок, который браузер до него не донесёт.
+ * Именно так и вышло с заголовком Telegram — на сервере он работал, а в
+ * приложении запрос резался и выглядел как «нет связи».
+ */
+describe('CORS: разрешённые заголовки', () => {
+  async function allowedHeaders(): Promise<string> {
+    const response = await ctx.app.inject({
+      method: 'OPTIONS',
+      url: '/api/session',
+      headers: {
+        origin: ALLOWED_ORIGIN,
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'x-telegram-init-data',
+      },
+    });
+    return (response.headers['access-control-allow-headers'] as string) ?? '';
+  }
+
+  it('заголовок запуска ВКонтакте разрешён', async () => {
+    expect((await allowedHeaders()).toLowerCase()).toContain('x-launch-params');
+  });
+
+  it('заголовок запуска Telegram разрешён', async () => {
+    expect((await allowedHeaders()).toLowerCase()).toContain('x-telegram-init-data');
+  });
+});

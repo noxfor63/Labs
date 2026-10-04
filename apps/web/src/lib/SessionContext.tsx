@@ -9,7 +9,7 @@ import {
 } from 'react';
 
 import { ApiRequestError, api } from '../api/client.js';
-import { fetchVkProfile } from '../vk/bridge.js';
+import { getPlatform } from '../platform/index.js';
 
 export type SessionState = {
   user: UserPublic | null;
@@ -47,9 +47,13 @@ export function SessionProvider({ children }: { children: ReactNode }): ReactNod
     const run = async (): Promise<void> => {
       setState((previous) => ({ ...previous, isLoading: true, error: null }));
       try {
-        // Профиль берём из VK Bridge. Вне фрейма ВКонтакте его нет — тогда
-        // не шлём ничего: бэкенд не должен затирать сохранённое имя заглушкой.
-        const profile = await fetchVkProfile();
+        /*
+         * Профиль спрашиваем у площадки. null означает одно из двух: его
+         * неоткуда взять (запуск вне фрейма) либо он приходит подписанным
+         * и серверу не нужен (Telegram). В обоих случаях не шлём ничего:
+         * бэкенд не должен затирать сохранённое имя заглушкой.
+         */
+        const profile = await getPlatform().fetchProfile();
         const response = await api.session(
           profile === null
             ? {}
