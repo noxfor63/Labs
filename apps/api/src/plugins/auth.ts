@@ -25,7 +25,11 @@ import {
   verifyLaunchParams,
 } from '../lib/launch-params.js';
 import { PLATFORM, type Principal } from '../lib/principal.js';
-import { TelegramInitDataError, verifyInitData } from '../lib/telegram-init-data.js';
+import {
+  describeInitData,
+  TelegramInitDataError,
+  verifyInitData,
+} from '../lib/telegram-init-data.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -93,7 +97,9 @@ function authenticateTelegram(raw: string, env: AppEnv): Principal {
     };
   } catch (error) {
     if (error instanceof TelegramInitDataError) {
-      throw unauthorized(error.message);
+      const detail =
+        env.AUTH_DEBUG === '' ? '' : ` — ${describeInitData(raw, env.TELEGRAM_BOT_TOKEN)}`;
+      throw unauthorized(`${error.message}${detail}`);
     }
     throw error;
   }

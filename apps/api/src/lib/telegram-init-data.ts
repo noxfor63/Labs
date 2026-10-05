@@ -122,6 +122,35 @@ function parseUser(raw: string | null): TelegramUser {
   };
 }
 
+/**
+ * Безопасная выжимка о том, почему подпись не сошлась.
+ *
+ * Временная диагностика: сообщение «подпись не совпала» одинаково для
+ * десятка разных причин, и отличить их по нему нельзя. Здесь нет ни
+ * самого initData, ни токена — только имена полей, длины и начала хэшей,
+ * по которым видно, разошлась подпись или сломался разбор.
+ */
+export function describeInitData(rawInitData: string, botToken: string): string {
+  const raw = rawInitData.trim().replace(/^\?/, '');
+  const params = new URLSearchParams(raw);
+  const keys = [...params.keys()].sort();
+  const given = params.get('hash') ?? '';
+  const computed = botToken === '' ? '' : signInitData(params, botToken);
+  const authDate = Number(params.get('auth_date') ?? 'NaN');
+  const ageSeconds = Number.isFinite(authDate)
+    ? Math.round(Date.now() / 1000 - authDate)
+    : null;
+
+  return [
+    `длина=${raw.length}`,
+    `поля=[${keys.join(',')}]`,
+    `hash: дано=${given.slice(0, 10)} длина=${given.length}`,
+    `hash: ждём=${computed.slice(0, 10)} длина=${computed.length}`,
+    `возраст=${ageSeconds === null ? '?' : `${ageSeconds}с`}`,
+    `токен: длина=${botToken.length} бот=${botToken.split(':')[0] ?? '?'}`,
+  ].join(' | ');
+}
+
 export type VerifyInitDataOptions = {
   /** Текущее время в миллисекундах; параметр ради детерминированных тестов. */
   now?: number;
