@@ -45,35 +45,76 @@ function findRawParams(): URLSearchParams | null {
   return null;
 }
 
-function readColorScheme(params: URLSearchParams): 'dark' | 'light' {
-  // Сначала явный параметр, если он есть.
-  const direct = params.get('tgWebAppColorScheme');
-  if (direct === 'dark' || direct === 'light') {
-    return direct;
+/** Яркость цвета #rgb или #rrggbb; null — разобрать не вышло. */
+function brightness(value: unknown): number | null {
+  if (typeof value !== 'string') {
+    return null;
   }
+  const hex = value.trim().replace(/^#/, '');
+  const full =
+    hex.length === 3
+      ? hex
+          .split('')
+          .map((ch) => ch + ch)
+          .join('')
+      : hex;
+  if (!/^[0-9a-f]{6}$/i.test(full)) {
+    return null;
+  }
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  // Та же формула яркости, что в рекомендациях по контрасту.
+  return (r * 299 + g * 587 + b * 114) / 1000;
+}
 
-  /*
-   * Иначе выводим из темы: tgWebAppThemeParams — это JSON с цветами
-   * клиента. Светлота фона решает надёжнее, чем угадывание по названию.
-   */
-  const rawTheme = params.get('tgWebAppThemeParams');
-  if (rawTheme !== null) {
-    try {
-      const theme = JSON.parse(rawTheme) as Record<string, unknown>;
-      const bg = theme['bg_color'];
-      if (typeof bg === 'string' && /^#[0-9a-f]{6}$/i.test(bg)) {
-        const r = parseInt(bg.slice(1, 3), 16);
-        const g = parseInt(bg.slice(3, 5), 16);
-        const b = parseInt(bg.slice(5, 7), 16);
-        // Та же формула яркости, что в рекомендациях по контрасту.
-        return (r * 299 + g * 587 + b * 114) / 1000 < 128 ? 'dark' : 'light';
+/** Схема по настройке самого устройства — последний рубеж. */
+function schemeFromDevice(): 'dark' | 'light' {
+  try {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  } catch {
+    return 'light';
+  }
+}
+
+/**
+ * Цветовая схема клиента.
+ *
+ * Источников три, по убыванию надёжности, и так сделано потому, что
+ * первые два приходят не всегда: прямой параметр, яркость фона из
+ * tgWebAppThemeParams и, если ничего нет, настройка устройства. Раньше
+ * источник был один, и у тех, кому Telegram тему в адресе не прислал,
+ * приложение открывалось светлым поверх тёмного клиента.
+ */
+export function readColorScheme(params: URLSearchParams | null): 'dark' | 'light' {
+  if (params !== null) {
+    const direct = params.get('tgWebAppColorScheme');
+    if (direct === 'dark' || direct === 'light') {
+      return direct;
+    }
+
+    const rawTheme = params.get('tgWebAppThemeParams');
+    if (rawTheme !== null) {
+      try {
+        const theme = JSON.parse(rawTheme) as Record<string, unknown>;
+        // bg_color — основной фон; secondary_bg_color встречается, когда
+        // основного в наборе нет.
+        const level = brightness(theme['bg_color']) ?? brightness(theme['secondary_bg_color']);
+        if (level !== null) {
+          return level < 128 ? 'dark' : 'light';
+        }
+        // Светлый текст означает тёмную тему — обратный признак.
+        const text = brightness(theme['text_color']);
+        if (text !== null) {
+          return text >= 128 ? 'dark' : 'light';
+        }
+      } catch {
+        // Тема не разобралась — не повод падать, спросим устройство.
       }
-    } catch {
-      // Тема не разобралась — не повод падать, берём светлую.
     }
   }
 
-  return 'light';
+  return schemeFromDevice();
 }
 
 /**
@@ -106,7 +147,9 @@ export function captureTelegramLaunch(): TelegramLaunch | null {
   try {
     const cached = window.sessionStorage.getItem(STORAGE_KEY);
     if (cached !== null && cached !== '') {
-      captured = { initData: cached, colorScheme: 'light' };
+      // Параметров темы в адресе уже нет — спрашиваем устройство, а не
+      // ставим светлую наугад.
+      captured = { initData: cached, colorScheme: readColorScheme(null) };
     }
   } catch {
     // Нет доступа к хранилищу — значит и кэша нет.
