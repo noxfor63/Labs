@@ -1,4 +1,4 @@
-import { formatPhone, normalizePhone } from '@vk-rideshare/shared';
+import { PRIVACY_POLICY_URL, formatPhone, normalizePhone } from '@vk-rideshare/shared';
 import { useActiveVkuiLocation, useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import {
   Avatar,
@@ -150,8 +150,24 @@ export function ProfilePanel({ id, view }: { id: string; view: string }): ReactN
 
       <Group header={<Header size="s">О приложении</Header>}>
         <Div style={{ color: 'var(--vkui--color_text_secondary)' }}>
-          Поиск попутчиков — договаривайтесь о поездке напрямую и оставляйте отзывы
-          после неё.
+          По пути — договаривайтесь о поездке напрямую и оставляйте отзывы после неё.
+        </Div>
+        {/*
+          Политика должна быть доступна всегда, а не только на экране
+          согласия: человек соглашается один раз, а вопрос «что вы обо мне
+          храните» возникает позже.
+        */}
+        <Div>
+          <Button
+            size="m"
+            mode="link"
+            href={PRIVACY_POLICY_URL}
+            target="_blank"
+            rel="noreferrer"
+            style={{ paddingLeft: 0 }}
+          >
+            Политика конфиденциальности
+          </Button>
         </Div>
       </Group>
     </Panel>

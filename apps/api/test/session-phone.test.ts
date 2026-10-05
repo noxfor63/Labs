@@ -21,12 +21,13 @@ afterAll(async () => {
   await ctx.close();
 });
 
+/** Согласие подставляется всем запросам: этот файл проверяет номер, а не его. */
 const session = (body: Record<string, unknown>) =>
   ctx.app.inject({
     method: 'POST',
     url: '/api/session',
     headers: authHeaders(VK_USER_ID),
-    payload: body,
+    payload: { privacyAccepted: true, ...body },
   });
 
 describe('POST /api/session — номер телефона', () => {

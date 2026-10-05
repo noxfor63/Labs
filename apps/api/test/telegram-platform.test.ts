@@ -45,7 +45,7 @@ describe('площадка Telegram', () => {
       method: 'POST',
       url: '/api/session',
       headers: telegramHeaders({ id: TG_ID, first_name: 'Рустам', last_name: 'Тележный' }),
-      payload: {},
+      payload: { privacyAccepted: true },
     });
 
     expect(response.statusCode).toBe(200);
@@ -64,7 +64,7 @@ describe('площадка Telegram', () => {
       url: '/api/session',
       headers: telegramHeaders({ id: TG_ID, first_name: 'Рустам', last_name: 'Тележный' }),
       // Тело можно подделать, подпись — нет. Выигрывает подпись.
-      payload: { firstName: 'Самозванец', lastName: 'Поддельный' },
+      payload: { privacyAccepted: true, firstName: 'Самозванец', lastName: 'Поддельный' },
     });
 
     expect(response.statusCode).toBe(200);
@@ -108,7 +108,7 @@ describe('площадка Telegram', () => {
       method: 'POST',
       url: '/api/session',
       headers: telegramHeaders({ id: TG_ID }, { botToken: '7000000000:ЧужойТокен' }),
-      payload: {},
+      payload: { privacyAccepted: true },
     });
 
     expect(response.statusCode).toBe(401);
@@ -121,7 +121,7 @@ describe('площадка Telegram', () => {
         method: 'POST',
         url: '/api/session',
         headers: telegramHeaders({ id: TG_ID }),
-        payload: {},
+        payload: { privacyAccepted: true },
       });
 
       expect(response.statusCode).toBe(401);

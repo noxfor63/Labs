@@ -112,8 +112,29 @@ export type UserPublic = z.infer<typeof userPublicSchema>;
 
 export const sessionResponseSchema = z.object({
   user: userPublicSchema,
+  /**
+   * Когда человек принял политику конфиденциальности. ISO-строка либо null.
+   *
+   * Поле живёт в ответе сессии, а не в UserPublic: дата согласия — дело
+   * между человеком и сервисом, остальным участникам поездки её видеть
+   * незачем.
+   */
+  privacyAcceptedAt: z.string().nullable(),
 });
 export type SessionResponse = z.infer<typeof sessionResponseSchema>;
+
+/**
+ * Состояние сессии до того, как что-либо сохранено.
+ *
+ * Нужно ровно для одного: узнать, принимал ли человек политику, не заводя
+ * его в базе. Пока согласия нет, приложение не имеет права ничего о нём
+ * записывать, поэтому `user` здесь может быть null.
+ */
+export const sessionStateSchema = z.object({
+  user: userPublicSchema.nullable(),
+  privacyAcceptedAt: z.string().nullable(),
+});
+export type SessionState = z.infer<typeof sessionStateSchema>;
 
 /* ──────────────────────────── поездки ──────────────────────────── */
 

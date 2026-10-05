@@ -1,8 +1,15 @@
+import type { User } from '@prisma/client';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 
-import { phoneInputSchema, type SessionResponse } from '@vk-rideshare/shared';
+import {
+  ERROR_CODE,
+  phoneInputSchema,
+  type SessionResponse,
+  type SessionState,
+} from '@vk-rideshare/shared';
 
+import { ApiError } from '../lib/errors.js';
 import { principalWhere } from '../lib/principal.js';
 import { parseWith } from '../lib/validate.js';
 import { toUserPublic } from '../lib/serializers.js';
@@ -26,16 +33,67 @@ const sessionBodySchema = z.object({
    * нормализации на клиенте нельзя — запрос можно отправить и мимо него.
    */
   phone: phoneInputSchema.optional(),
+  /**
+   * Согласие с политикой конфиденциальности.
+   *
+   * Только `true`: «я согласился» — событие, а «я не согласился» событием
+   * не является и присылать его незачем. Отозвать согласие этим полем
+   * нельзя, для этого есть удаление данных по обращению.
+   */
+  privacyAccepted: z.literal(true).optional(),
 });
+
+/** Дата согласия в ответе — ISO-строкой, как и все остальные даты контракта. */
+function privacyAcceptedIso(user: Pick<User, 'privacyAcceptedAt'>): string | null {
+  return user.privacyAcceptedAt === null ? null : user.privacyAcceptedAt.toISOString();
+}
 
 export const sessionRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPluginAsync => {
   return async (fastify) => {
+    /**
+     * Состояние сессии, ничего не создавая.
+     *
+     * Нужно, чтобы узнать, принимал ли человек политику, до того как о нём
+     * будет записана хоть одна строка. Отсюда и раздельность: читающий
+     * GET можно звать всегда, пишущий POST — только после согласия.
+     */
+    fastify.get('/session', async (request): Promise<SessionState> => {
+      const user = await prisma.user.findUnique({
+        where: principalWhere(request.principal),
+      });
+      if (user === null) {
+        return { user: null, privacyAcceptedAt: null };
+      }
+      return { user: toUserPublic(user), privacyAcceptedAt: privacyAcceptedIso(user) };
+    });
+
     fastify.post(
       '/session',
       { config: { rateLimit: writeRateLimit } },
       async (request): Promise<SessionResponse> => {
         const body = parseWith(sessionBodySchema, request.body ?? {});
         const principal = request.principal;
+
+        const existing = await prisma.user.findUnique({ where: principalWhere(principal) });
+
+        /*
+         * Главная проверка этого маршрута, и она стоит до любой записи.
+         *
+         * Правила площадок требуют согласия с политикой до обработки
+         * персональных данных, а не после. Поэтому без согласия здесь не
+         * заводится даже строка пользователя: нет согласия — нет данных.
+         * Проверка на сервере, а не только на экране, потому что запрос
+         * можно отправить и мимо интерфейса.
+         */
+        const acceptedAt =
+          existing?.privacyAcceptedAt ?? (body.privacyAccepted === true ? new Date() : null);
+        if (acceptedAt === null) {
+          throw new ApiError(
+            403,
+            ERROR_CODE.PRIVACY_NOT_ACCEPTED,
+            'Нужно принять политику конфиденциальности',
+          );
+        }
 
         /*
          * Подписанный профиль площадки важнее присланного телом: Telegram
@@ -53,6 +111,7 @@ export const sessionRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlu
           photoUrl?: string | null;
           city?: string | null;
           phone?: string | null;
+          privacyAcceptedAt?: Date;
         } = {};
         if (signed !== undefined) {
           update.firstName = signed.firstName;
@@ -75,6 +134,12 @@ export const sessionRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlu
         if (body.phone !== undefined) {
           update.phone = body.phone;
         }
+        // Дата согласия проставляется один раз и больше не трогается:
+        // повторное «принимаю» не должно переписывать момент, который уже
+        // зафиксирован, иначе доказать его задним числом станет нечем.
+        if (existing?.privacyAcceptedAt === undefined || existing.privacyAcceptedAt === null) {
+          update.privacyAcceptedAt = acceptedAt;
+        }
 
         /**
          * Единственное место, где пользователь заводится. Ключ поиска и
@@ -90,11 +155,12 @@ export const sessionRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlu
             photoUrl: signed?.photoUrl ?? body.photoUrl ?? null,
             city: body.city ?? null,
             phone: body.phone ?? null,
+            privacyAcceptedAt: acceptedAt,
           },
           update,
         });
 
-        return { user: toUserPublic(user) };
+        return { user: toUserPublic(user), privacyAcceptedAt: privacyAcceptedIso(user) };
       },
     );
   };

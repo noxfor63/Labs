@@ -30,6 +30,7 @@ import { useState, type ReactNode } from 'react';
 
 import { getPlatform } from './platform/index.js';
 import { ErrorState } from './components/ErrorState.js';
+import { PrivacyGate } from './components/PrivacyGate.js';
 import { useSession } from './lib/SessionContext.js';
 import { ReviewModal } from './modals/ReviewModal.js';
 import { CreatePanel } from './panels/CreatePanel.js';
@@ -113,6 +114,15 @@ export function App(): ReactNode {
         </SplitCol>
       </SplitLayout>
     );
+  }
+
+  /*
+   * Согласие — раньше всего остального, что видно человеку. Проверка стоит
+   * до ошибки намеренно: пока согласия нет, сессии тоже нет, и показывать
+   * «не удалось подтвердить запуск» было бы неправдой.
+   */
+  if (session.needsPrivacyConsent) {
+    return <PrivacyGate />;
   }
 
   if (session.error !== null) {

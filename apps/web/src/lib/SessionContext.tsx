@@ -15,7 +15,17 @@ export type SessionState = {
   user: UserPublic | null;
   isLoading: boolean;
   error: ApiRequestError | null;
+  /**
+   * Человек ещё не принимал политику конфиденциальности.
+   *
+   * Пока это true, приложение не отправило о нём на сервер ничего —
+   * ни имени, ни города. Правила площадок требуют согласия до обработки,
+   * а не после, и выполнить это можно только так: сначала спросить.
+   */
+  needsPrivacyConsent: boolean;
   reload: () => void;
+  /** Принять политику и завести сессию. Бросает ApiRequestError. */
+  acceptPrivacy: () => Promise<void>;
   /**
    * Сохраняет номер телефона в профиль и обновляет состояние.
    * Бросает ApiRequestError — вызывающий показывает сообщение сам.
@@ -27,17 +37,41 @@ const SessionContext = createContext<SessionState>({
   user: null,
   isLoading: true,
   error: null,
+  needsPrivacyConsent: false,
   reload: () => undefined,
+  acceptPrivacy: () => Promise.resolve(),
   savePhone: () => Promise.resolve(),
 });
 
 export const useSession = (): SessionState => useContext(SessionContext);
 
+type Stored = Omit<SessionState, 'reload' | 'acceptPrivacy' | 'savePhone'>;
+
+/**
+ * Профиль площадки в виде, пригодном для отправки.
+ *
+ * null означает одно из двух: его неоткуда взять (запуск вне фрейма) либо
+ * он приходит подписанным и серверу не нужен (Telegram). В обоих случаях
+ * не шлём ничего: бэкенд не должен затирать сохранённое имя заглушкой.
+ */
+async function profileBody(): Promise<Record<string, unknown>> {
+  const profile = await getPlatform().fetchProfile();
+  return profile === null
+    ? {}
+    : {
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        photoUrl: profile.photoUrl,
+        city: profile.city,
+      };
+}
+
 export function SessionProvider({ children }: { children: ReactNode }): ReactNode {
-  const [state, setState] = useState<Omit<SessionState, 'reload' | 'savePhone'>>({
+  const [state, setState] = useState<Stored>({
     user: null,
     isLoading: true,
     error: null,
+    needsPrivacyConsent: false,
   });
   const [attempt, setAttempt] = useState(0);
 
@@ -48,24 +82,32 @@ export function SessionProvider({ children }: { children: ReactNode }): ReactNod
       setState((previous) => ({ ...previous, isLoading: true, error: null }));
       try {
         /*
-         * Профиль спрашиваем у площадки. null означает одно из двух: его
-         * неоткуда взять (запуск вне фрейма) либо он приходит подписанным
-         * и серверу не нужен (Telegram). В обоих случаях не шлём ничего:
-         * бэкенд не должен затирать сохранённое имя заглушкой.
+         * Первый запрос — читающий и ничего не создающий. Он отвечает на
+         * единственный вопрос: спрашивали ли у этого человека согласие.
+         * Пишущий POST идёт следом и только если согласие уже есть.
          */
-        const profile = await getPlatform().fetchProfile();
-        const response = await api.session(
-          profile === null
-            ? {}
-            : {
-                firstName: profile.firstName,
-                lastName: profile.lastName,
-                photoUrl: profile.photoUrl,
-                city: profile.city,
-              },
-        );
+        const current = await api.getSession();
+        if (cancelled) {
+          return;
+        }
+        if (current.privacyAcceptedAt === null) {
+          setState({
+            user: null,
+            isLoading: false,
+            error: null,
+            needsPrivacyConsent: true,
+          });
+          return;
+        }
+
+        const response = await api.session(await profileBody());
         if (!cancelled) {
-          setState({ user: response.user, isLoading: false, error: null });
+          setState({
+            user: response.user,
+            isLoading: false,
+            error: null,
+            needsPrivacyConsent: false,
+          });
         }
       } catch (error) {
         if (cancelled) {
@@ -74,6 +116,7 @@ export function SessionProvider({ children }: { children: ReactNode }): ReactNod
         setState({
           user: null,
           isLoading: false,
+          needsPrivacyConsent: false,
           error:
             error instanceof ApiRequestError
               ? error
@@ -88,6 +131,16 @@ export function SessionProvider({ children }: { children: ReactNode }): ReactNod
     };
   }, [attempt]);
 
+  const acceptPrivacy = useCallback(async (): Promise<void> => {
+    const response = await api.session({ ...(await profileBody()), privacyAccepted: true });
+    setState({
+      user: response.user,
+      isLoading: false,
+      error: null,
+      needsPrivacyConsent: false,
+    });
+  }, []);
+
   const savePhone = useCallback(async (phone: string | null): Promise<void> => {
     const response = await api.session({ phone });
     setState((previous) => ({ ...previous, user: response.user }));
@@ -97,6 +150,7 @@ export function SessionProvider({ children }: { children: ReactNode }): ReactNod
     <SessionContext.Provider
       value={{
         ...state,
+        acceptPrivacy,
         savePhone,
         reload: () => {
           setAttempt((value) => value + 1);

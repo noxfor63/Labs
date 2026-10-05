@@ -164,6 +164,10 @@ export async function createUser(
       vkUserId,
       firstName: overrides.firstName ?? `Тест${vkUserId}`,
       lastName: overrides.lastName ?? 'Тестов',
+      // Согласие проставлено: эти пользователи изображают тех, кто уже
+      // прошёл экран согласия, иначе каждый тест про поездки спотыкался бы
+      // о проверку, к которой он не имеет отношения.
+      privacyAcceptedAt: new Date(),
     },
     update: {},
     select: { id: true },

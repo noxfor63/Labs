@@ -48,6 +48,15 @@ export const LAUNCH_PARAMS_HEADER = 'x-launch-params';
 /** Заголовок, которым фронтенд Telegram передаёт initData как есть. */
 export const TELEGRAM_INIT_DATA_HEADER = 'x-telegram-init-data';
 
+/**
+ * Постоянный адрес политики конфиденциальности.
+ *
+ * Лежит здесь, а не в компоненте: ссылка нужна и экрану согласия, и
+ * профилю, и карточке приложения в кабинете площадки, и разъехаться эти
+ * три места не должны. Страница отдаётся тем же nginx, что и API.
+ */
+export const PRIVACY_POLICY_URL = 'https://vk-rideshare.duckdns.org/privacy';
+
 /** Launch-параметры старше суток считаются протухшими. */
 export const LAUNCH_PARAMS_MAX_AGE_SECONDS = 24 * 60 * 60;
 
@@ -114,6 +123,8 @@ export const ERROR_CODE = {
   NOT_A_PARTICIPANT: 'NOT_A_PARTICIPANT',
   ALREADY_REVIEWED: 'ALREADY_REVIEWED',
   SELF_REVIEW: 'SELF_REVIEW',
+  /** Человек ещё не принял политику конфиденциальности. */
+  PRIVACY_NOT_ACCEPTED: 'PRIVACY_NOT_ACCEPTED',
   RATE_LIMITED: 'RATE_LIMITED',
   INTERNAL: 'INTERNAL',
 } as const;

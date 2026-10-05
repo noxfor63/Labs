@@ -12,6 +12,7 @@ import {
   type MyRequestDto,
   type ReviewableParticipants,
   type SessionResponse,
+  type SessionState,
   type TripDetail,
   type TripListQuery,
   type TripListResponse,
@@ -126,6 +127,15 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 }
 
 export const api = {
+  /**
+   * Состояние сессии, ничего не создавая.
+   *
+   * Зовётся первым при запуске: пока не известно, принимал ли человек
+   * политику, писать о нём на сервер нельзя.
+   */
+  getSession: (signal?: AbortSignal): Promise<SessionState> =>
+    request('/session', { ...(signal === undefined ? {} : { signal }) }),
+
   session: (profile: {
     firstName?: string;
     lastName?: string;
@@ -133,6 +143,8 @@ export const api = {
     city?: string | null;
     /** Номер в любом виде — бэкенд сам приведёт к +7XXXXXXXXXX. */
     phone?: string | null;
+    /** Согласие с политикой. Без него сервер вернёт PRIVACY_NOT_ACCEPTED. */
+    privacyAccepted?: true;
   }): Promise<SessionResponse> => request('/session', { method: 'POST', body: profile }),
 
   listTrips: (query: TripListQuery, signal?: AbortSignal): Promise<TripListResponse> =>

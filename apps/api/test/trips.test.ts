@@ -364,7 +364,7 @@ describe('PATCH /api/trips/:id и мои разделы', () => {
       method: 'POST',
       url: '/api/session',
       headers: authHeaders(newcomer),
-      payload: { firstName: 'Пётр', lastName: 'Петров', city: AKBULAK },
+      payload: { privacyAccepted: true, firstName: 'Пётр', lastName: 'Петров', city: AKBULAK },
     });
 
     expect(first.statusCode).toBe(200);
@@ -378,7 +378,7 @@ describe('PATCH /api/trips/:id и мои разделы', () => {
       method: 'POST',
       url: '/api/session',
       headers: authHeaders(newcomer),
-      payload: { firstName: 'Пётр', lastName: 'Сидоров', city: SOL_ILETSK },
+      payload: { privacyAccepted: true, firstName: 'Пётр', lastName: 'Сидоров', city: SOL_ILETSK },
     });
 
     expect(second.json().user).toMatchObject({ lastName: 'Сидоров', city: SOL_ILETSK });

@@ -26,7 +26,7 @@ describe('rate limit на запись', () => {
         method: 'POST',
         url: '/api/session',
         headers: authHeaders(AUTHOR),
-        payload: { firstName: 'Тест', lastName: 'Тестов' },
+        payload: { privacyAccepted: true, firstName: 'Тест', lastName: 'Тестов' },
       });
 
     expect((await send()).statusCode).toBe(200);
