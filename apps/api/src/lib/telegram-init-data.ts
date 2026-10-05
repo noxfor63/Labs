@@ -10,10 +10,12 @@
  *     склеенных как `ключ=значение` через перевод строки. Повторно
  *     кодировать ничего нельзя — в отличие от ВКонтакте, где
  *     каноническая строка собирается обратно в query.
- *  3. Из подписи исключаются и `hash`, и `signature`. Второе поле
- *     Telegram добавил позже для сторонней проверки по Ed25519; если его
- *     не исключить, подпись перестанет сходиться у всех пользователей
- *     сразу, причём без всякого предупреждения.
+ *  3. Из подписи исключается `hash` — и, по документации, **только** он.
+ *     Поле `signature` Telegram добавил позже для сторонней проверки по
+ *     Ed25519, и в расчёт `hash` оно входит наравне с остальными.
+ *     Проверяем оба варианта, с ним и без: что именно кладёт в подпись
+ *     конкретная версия клиента, снаружи не узнать, а цена ошибки —
+ *     отказ всем пользователям сразу и без объяснений.
  *  4. Результат — hex, а не base64url.
  *
  * Значение поля `user` берётся из строки как есть и разбирается только
@@ -55,19 +57,41 @@ export function deriveSecretKey(botToken: string): Buffer {
 /**
  * Строка, которую подписывает Telegram: пары `ключ=значение` с
  * декодированными значениями, отсортированные по ключу, через `\n`.
+ *
+ * `withSignature: false` дополнительно выбрасывает поле `signature` —
+ * см. пункт 3 в заголовке файла.
  */
-export function buildDataCheckString(params: URLSearchParams): string {
+export function buildDataCheckString(
+  params: URLSearchParams,
+  withSignature = true,
+): string {
   return [...params.entries()]
-    .filter(([key]) => key !== 'hash' && key !== 'signature')
+    .filter(([key]) => key !== 'hash' && (withSignature || key !== 'signature'))
     .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
     .map(([key, value]) => `${key}=${value}`)
     .join('\n');
 }
 
-export function signInitData(params: URLSearchParams, botToken: string): string {
+export function signInitData(
+  params: URLSearchParams,
+  botToken: string,
+  withSignature = true,
+): string {
   return createHmac('sha256', deriveSecretKey(botToken))
-    .update(buildDataCheckString(params))
+    .update(buildDataCheckString(params, withSignature))
     .digest('hex');
+}
+
+/** Совпала ли подпись хотя бы в одном из двух вариантов. */
+function signatureMatches(
+  params: URLSearchParams,
+  botToken: string,
+  given: string,
+): boolean {
+  return (
+    equalsConstantTime(given, signInitData(params, botToken, true)) ||
+    equalsConstantTime(given, signInitData(params, botToken, false))
+  );
 }
 
 function equalsConstantTime(left: string, right: string): boolean {
@@ -135,7 +159,8 @@ export function describeInitData(rawInitData: string, botToken: string): string 
   const params = new URLSearchParams(raw);
   const keys = [...params.keys()].sort();
   const given = params.get('hash') ?? '';
-  const computed = botToken === '' ? '' : signInitData(params, botToken);
+  const withSig = botToken === '' ? '' : signInitData(params, botToken, true);
+  const withoutSig = botToken === '' ? '' : signInitData(params, botToken, false);
   const authDate = Number(params.get('auth_date') ?? 'NaN');
   const ageSeconds = Number.isFinite(authDate)
     ? Math.round(Date.now() / 1000 - authDate)
@@ -145,7 +170,8 @@ export function describeInitData(rawInitData: string, botToken: string): string 
     `длина=${raw.length}`,
     `поля=[${keys.join(',')}]`,
     `hash: дано=${given.slice(0, 10)} длина=${given.length}`,
-    `hash: ждём=${computed.slice(0, 10)} длина=${computed.length}`,
+    `ждём(c sig)=${withSig.slice(0, 10)}`,
+    `ждём(без sig)=${withoutSig.slice(0, 10)}`,
     `возраст=${ageSeconds === null ? '?' : `${ageSeconds}с`}`,
     `токен: длина=${botToken.length} бот=${botToken.split(':')[0] ?? '?'}`,
   ].join(' | ');
@@ -178,7 +204,7 @@ export function verifyInitData(
     throw new TelegramInitDataError('В initData нет подписи');
   }
 
-  if (!equalsConstantTime(hash, signInitData(params, botToken))) {
+  if (!signatureMatches(params, botToken, hash)) {
     throw new TelegramInitDataError('Подпись initData не совпала');
   }
 

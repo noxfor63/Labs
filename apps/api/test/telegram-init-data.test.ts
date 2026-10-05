@@ -65,13 +65,39 @@ describe('verifyInitData', () => {
     expect(verified.user.photoUrl).toBe('https://t.me/i/userpic/320/abc.jpg');
   });
 
-  it('поле signature в подпись не входит', () => {
-    // Telegram добавляет signature для сторонней проверки по Ed25519.
-    // Подпись считается без него, поэтому дописанное поле ничего не ломает.
-    const signed = makeInitData();
-    const withSignature = `${signed}&signature=abcdef0123456789`;
+  /*
+   * Поле signature Telegram добавил позже, и какая из двух версий подписи
+   * придёт от конкретного клиента, снаружи не узнать. Поэтому принимаются
+   * обе — оба случая ниже должны проходить. Именно на этом приложение и
+   * споткнулось на живом запуске: signature исключался из расчёта, а
+   * Telegram его туда включал, и подпись не сходилась ни у кого.
+   */
+  it('подпись, посчитанная ВМЕСТЕ с signature, принимается', () => {
+    const params = new URLSearchParams(makeInitData({}, { omitHash: true }));
+    params.set('signature', 'Ed25519SignatureFromTelegram');
+    params.set('hash', signInitData(params, BOT_TOKEN, true));
 
-    expect(() => verifyInitData(withSignature, BOT_TOKEN)).not.toThrow();
+    expect(() => verifyInitData(params.toString(), BOT_TOKEN)).not.toThrow();
+  });
+
+  it('подпись, посчитанная БЕЗ signature, тоже принимается', () => {
+    const params = new URLSearchParams(makeInitData({}, { omitHash: true }));
+    params.set('signature', 'Ed25519SignatureFromTelegram');
+    params.set('hash', signInitData(params, BOT_TOKEN, false));
+
+    expect(() => verifyInitData(params.toString(), BOT_TOKEN)).not.toThrow();
+  });
+
+  it('подделка не проходит и при наличии signature', () => {
+    const params = new URLSearchParams(makeInitData({}, { omitHash: true }));
+    params.set('signature', 'Ed25519SignatureFromTelegram');
+    params.set('hash', signInitData(params, BOT_TOKEN, true));
+    // Меняем имя уже после подписания.
+    params.set('user', JSON.stringify({ ...USER, first_name: 'Чужой' }));
+
+    expect(() => verifyInitData(params.toString(), BOT_TOKEN)).toThrow(
+      TelegramInitDataError,
+    );
   });
 
   it('подделанное имя подпись не проходит', () => {
@@ -139,7 +165,7 @@ describe('verifyInitData', () => {
 });
 
 describe('детали алгоритма', () => {
-  it('строка для подписи — декодированные значения через перевод строки, по алфавиту', () => {
+  it('строка для подписи — декодированные значения через перевод строки, по алфавиту; hash всегда вне подписи, signature — по варианту', () => {
     const params = new URLSearchParams({
       b: 'второй',
       a: 'первый',
@@ -148,7 +174,10 @@ describe('детали алгоритма', () => {
       signature: 'тоже игнорируется',
     });
 
-    expect(buildDataCheckString(params)).toBe('a=первый\nb=второй\nuser={"id":1}');
+    expect(buildDataCheckString(params)).toBe(
+      'a=первый\nb=второй\nsignature=тоже игнорируется\nuser={"id":1}',
+    );
+    expect(buildDataCheckString(params, false)).toBe('a=первый\nb=второй\nuser={"id":1}');
   });
 
   it('ключ HMAC — это HMAC("WebAppData", токен), а не сам токен', () => {
