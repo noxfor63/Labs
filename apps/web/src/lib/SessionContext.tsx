@@ -66,6 +66,27 @@ async function profileBody(): Promise<Record<string, unknown>> {
       };
 }
 
+/**
+ * Состояние сессии с запасным путём на время выкатки.
+ *
+ * Фронтенд и бэкенд обновляются не одновременно: один живёт на хостинге
+ * площадки, другой на своём сервере. В промежутке новый фронтенд может
+ * постучаться в старый бэкенд, где `GET /session` ещё нет, и получить 404.
+ * Ронять из-за этого приложение незачем: старый бэкенд согласия и не
+ * требовал, поэтому ведём себя как раньше. Как только сервер обновится,
+ * ветка перестанет срабатывать сама.
+ */
+async function readSessionState(): Promise<{ privacyAcceptedAt: string | null }> {
+  try {
+    return await api.getSession();
+  } catch (error) {
+    if (error instanceof ApiRequestError && error.status === 404) {
+      return { privacyAcceptedAt: new Date().toISOString() };
+    }
+    throw error;
+  }
+}
+
 export function SessionProvider({ children }: { children: ReactNode }): ReactNode {
   const [state, setState] = useState<Stored>({
     user: null,
@@ -86,7 +107,7 @@ export function SessionProvider({ children }: { children: ReactNode }): ReactNod
          * единственный вопрос: спрашивали ли у этого человека согласие.
          * Пишущий POST идёт следом и только если согласие уже есть.
          */
-        const current = await api.getSession();
+        const current = await readSessionState();
         if (cancelled) {
           return;
         }
