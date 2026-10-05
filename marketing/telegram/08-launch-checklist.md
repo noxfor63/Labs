@@ -465,6 +465,7 @@ curl -sS "https://api.telegram.org/bot$TOKEN/sendMessage" -H 'Content-Type: appl
 | `"Bad Request: not enough rights to send text messages to the chat"` | Бот админ, но без права «Публикация сообщений» |
 | `"Bad Request: BUTTON_URL_INVALID"` | В `url` осталась заглушка или ссылка без `https://` |
 | `"Bad Request: message text is empty"` | Сломан JSON — шаг 7 это ловит |
+| `curl: option -d: error encountered when reading a file` | Файла нет по этому пути. Путь к `post.json` пишите целиком, от `/root` |
 | `curl: (3) URL using bad/illegal format` | Переменная `TOKEN` пустая: новое подключение к серверу, шаг 4 заново |
 | `curl: (28) Failed to connect to api.telegram.org:443` | Адрес недоступен из вашей сети — шаг 4а |
 | Ничего не возвращается, команда висит | С сервера закрыт исходящий 443 |
