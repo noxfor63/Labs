@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: 1080px 1080px; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1080px; height: 1080px; overflow: hidden; }
+  body {
+    background: #ffffff;
+    font-family: 'Liberation Sans', 'DejaVu Sans', sans-serif;
+    color: #1a1a1a;
+    -webkit-font-smoothing: antialiased;
+  }
+  #stage { position: relative; width: 1080px; height: 1080px; }
+  .layer { position: absolute; inset: 0; }
+
+  /* Вотермарка бренда — присутствует весь ролик, кроме финала. */
+  #mark {
+    position: absolute; top: 56px; left: 0; width: 100%;
+    text-align: center; font-size: 34px; font-weight: 700;
+    letter-spacing: .02em; color: #A33A22;
+  }
+
+  #route { position: absolute; inset: 0; }
+  .city {
+    position: absolute; font-size: 38px; font-weight: 700; color: #1a1a1a;
+    white-space: nowrap;
+  }
+
+  #phone {
+    position: absolute; left: 50%; top: 50%;
+    width: 470px; height: 812px;
+    background: #fff; border-radius: 48px;
+    border: 1px solid #e9eaec;
+    box-shadow: 0 40px 90px rgba(26,26,26,.16), 0 8px 24px rgba(26,26,26,.07);
+    overflow: hidden;
+  }
+  #phone .shot {
+    position: absolute; left: 9px; top: 9px;
+    width: 452px; height: 794px; border-radius: 40px; overflow: hidden;
+    background: #fff;
+  }
+  #phone .shot img {
+    position: absolute; left: 0; top: 0; width: 452px; display: block;
+  }
+
+  #caption {
+    position: absolute; left: 0; width: 100%; text-align: center;
+    font-size: 44px; font-weight: 700; line-height: 1.2; color: #1a1a1a;
+  }
+
+  #final { position: absolute; inset: 0; display: flex;
+    flex-direction: column; align-items: center; justify-content: center; gap: 0; }
+  #final img { width: 184px; height: 184px; border-radius: 42px;
+    box-shadow: 0 24px 60px rgba(226,97,60,.28); }
+  #final .name { font-size: 100px; font-weight: 700; margin-top: 44px; letter-spacing: -.01em; }
+  #final .cities { font-size: 36px; color: #6b6f73; margin-top: 16px; }
+  #final .badges { display: flex; gap: 20px; margin-top: 54px; }
+  #final .badge {
+    font-size: 32px; font-weight: 700; padding: 20px 40px; border-radius: 999px;
+    background: #E2613C; color: #fff;
+  }
+  #final .badge.alt { background: #fff; color: #A33A22; border: 3px solid #F3C4B4; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="mark">По пути</div>
+
+  <!-- Сцена 1: маршрут рисует сам себя -->
+  <svg id="route" viewBox="0 0 1080 1080" width="1080" height="1080">
+    <defs>
+      <mask id="reveal">
+        <path id="revealPath" d="M 200 812 C 212 638 332 584 520 566 C 700 549 800 474 850 360"
+              fill="none" stroke="#fff" stroke-width="80" stroke-linecap="round"
+              pathLength="1000" stroke-dasharray="1000" stroke-dashoffset="1000"/>
+      </mask>
+    </defs>
+    <g mask="url(#reveal)">
+      <path d="M 200 812 C 212 638 332 584 520 566 C 700 549 800 474 850 360"
+            fill="none" stroke="#E2613C" stroke-width="22"
+            stroke-linecap="round" stroke-dasharray="2 54"/>
+    </g>
+    <g id="dotFrom">
+      <circle cx="200" cy="812" r="34" fill="#E2613C"/>
+      <circle cx="200" cy="812" r="14" fill="#fff"/>
+    </g>
+    <!-- Промежуточная точка меньше конечных: по размеру сразу видно, что
+         это остановка по пути, а не пункт назначения. -->
+    <g id="dotVia">
+      <circle cx="520" cy="566" r="23" fill="#E2613C"/>
+      <circle cx="520" cy="566" r="9" fill="#fff"/>
+    </g>
+    <g id="pinTo">
+      <path d="M 850 360 C 816 318 801 302 801 284 A 49 49 0 1 1 899 284 C 899 302 884 318 850 360 Z" fill="#E2613C"/>
+      <circle cx="850" cy="282" r="21" fill="#fff"/>
+    </g>
+  </svg>
+  <div class="city" id="cityFrom">Оренбург</div>
+  <div class="city" id="cityVia">Соль-Илецк</div>
+  <div class="city" id="cityTo">Акбулак</div>
+
+  <!-- Сцены 2–3: телефон с настоящими экранами -->
+  <div id="phone">
+    <div class="shot">
+      <img id="shotA" src="../../store/screen-1-search.png">
+      <img id="shotB" src="../../store/screen-2-trip.png">
+    </div>
+  </div>
+  <div id="caption"></div>
+
+  <!-- Сцена 4: финал -->
+  <div id="final">
+    <img id="finIcon" src="../../app-icon-512.png">
+    <div class="name" id="finName">По пути</div>
+    <div class="cities" id="finCities">Оренбург · Соль-Илецк · Акбулак</div>
+    <div class="badges">
+      <div class="badge" id="finVk">ВКонтакте</div>
+      <div class="badge alt" id="finTg">Telegram</div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ──────────────────────────────────────────────────────────────
+   Один кадр = одно значение t. Никаких CSS-переходов и таймеров:
+   браузер снимает ровно то, что посчитано здесь. Иначе кадры
+   разъезжались бы по фазе, и склейка дёргалась бы.
+   ────────────────────────────────────────────────────────────── */
+const DUR = 12.6;
+
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+/** Доля прохождения отрезка [a,b] в момент t. */
+const span = (t, a, b) => clamp((t - a) / (b - a), 0, 1);
+/** Плавный вход-выход: быстро начинает, мягко останавливается. */
+const ease = (p) => (p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
+const easeOut = (p) => 1 - Math.pow(1 - p, 3);
+const mix = (a, b, p) => a + (b - a) * p;
+
+function render(t) {
+  const S = (id) => document.getElementById(id);
+
+  /* Вотермарка: есть всю дорогу, уходит к финалу. */
+  S('mark').style.opacity = String(1 - span(t, 3.1, 3.6));
+
+  /* ── Сцена 1: маршрут ── */
+  const routeIn  = span(t, 0.15, 2.45);         // линия прорисовывается
+  const routeOut = span(t, 3.0, 3.5);           // и уходит
+  S('revealPath').setAttribute('stroke-dashoffset', String(1000 * (1 - easeOut(routeIn))));
+  S('dotFrom').style.opacity = String(span(t, 0.0, 0.35));
+  /* Точки загораются в тот момент, когда линия до них дочерчена. */
+  S('dotVia').style.opacity  = String(span(t, 1.30, 1.60));
+  S('pinTo').style.opacity   = String(span(t, 2.15, 2.55));
+  S('route').style.opacity   = String(1 - routeOut);
+  S('route').style.transform = `scale(${mix(1, .94, ease(routeOut))})`;
+  S('route').style.transformOrigin = '540px 560px';
+
+  const cityFrom = S('cityFrom'), cityVia = S('cityVia'), cityTo = S('cityTo');
+  cityFrom.style.left = '200px'; cityFrom.style.top = '868px';
+  cityVia.style.left  = '520px'; cityVia.style.top  = '612px';
+  cityTo.style.left   = '850px'; cityTo.style.top   = '166px';
+  for (const el of [cityFrom, cityVia, cityTo]) el.style.transform = 'translateX(-50%)';
+  /* Промежуточная подпись мельче и светлее — та же мысль, что и с точкой. */
+  cityVia.style.fontSize = '31px';
+  cityVia.style.color = '#6b6f73';
+  cityFrom.style.opacity = String(span(t, 0.35, 0.9)  * (1 - routeOut));
+  cityVia.style.opacity  = String(span(t, 1.45, 1.85) * (1 - routeOut));
+  cityTo.style.opacity   = String(span(t, 2.45, 2.85) * (1 - routeOut));
+
+  /* ── Сцены 2–3: телефон ── */
+  const phoneIn  = span(t, 3.3, 4.2);
+  const phoneOut = span(t, 9.7, 10.4);
+  const rise = mix(1080, 0, easeOut(phoneIn));            // въезжает снизу
+  const sink = mix(0, -70, ease(phoneOut));               // уходит вверх, уменьшаясь
+  const scale = mix(1, .86, ease(phoneOut));
+  const phone = S('phone');
+  phone.style.opacity = String(phoneIn * (1 - phoneOut));
+  phone.style.transform =
+    `translate(-50%, calc(-50% + ${rise + sink + 66}px)) scale(${scale})`;
+
+  /* Смена экрана: поиск → карточка поездки. */
+  const swap = span(t, 6.8, 7.3);
+  S('shotA').style.opacity = String(1 - swap);
+  S('shotB').style.opacity = String(swap);
+  /*
+   * Медленный наезд вместо прокрутки. Прокрутка срезала заголовок экрана
+   * сверху, и кадр читался не как движение, а как брак отрисовки.
+   */
+  S('shotA').style.transform = `scale(${mix(1, 1.045, span(t, 3.6, 7.0))})`;
+  S('shotA').style.transformOrigin = '226px 120px';
+  S('shotB').style.transform = `scale(${mix(1, 1.045, span(t, 7.0, 10.0))})`;
+  S('shotB').style.transformOrigin = '226px 120px';
+
+  /* ── Подписи ── */
+  const cap = S('caption');
+  let text = '', vis = 0;
+  if (t < 7.0) { text = 'Видно, кто уже едет'; vis = span(t, 4.0, 4.5) * (1 - span(t, 6.6, 7.0)); }
+  else         { text = 'Цена, места и кто за рулём'; vis = span(t, 7.1, 7.5) * (1 - span(t, 9.5, 9.9)); }
+  cap.textContent = text;
+  cap.style.top = '84px';
+  cap.style.opacity = String(vis);
+  cap.style.transform = `translateY(${mix(14, 0, easeOut(vis))}px)`;
+
+  /* ── Сцена 4: финал ── */
+  const finIn = span(t, 10.3, 11.1);
+  const fin = S('final');
+  fin.style.opacity = String(finIn);
+  fin.style.transform = `scale(${mix(.92, 1, easeOut(finIn))})`;
+
+  /*
+   * Элементы финала появляются по очереди, а не все разом. Статичный
+   * кадр в конце ролика в ленте читается как «видео кончилось» — глаз
+   * уходит раньше, чем дочитает, куда нажимать.
+   */
+  const steps = [
+    ['finIcon',   10.35, 10.95],
+    ['finName',   10.70, 11.25],
+    ['finCities', 11.00, 11.50],
+    ['finVk',     11.30, 11.80],
+    ['finTg',     11.50, 12.00],
+  ];
+  for (const [id, a, b] of steps) {
+    const p = span(t, a, b);
+    const el = S(id);
+    el.style.opacity = String(p);
+    el.style.transform = `translateY(${mix(22, 0, easeOut(p))}px)`;
+  }
+}
+
+const q = new URLSearchParams(location.search);
+render(Math.min(DUR, Math.max(0, parseFloat(q.get('t') || '0'))));
+document.title = 'ready';
+</script>
+</body>
+</html>
