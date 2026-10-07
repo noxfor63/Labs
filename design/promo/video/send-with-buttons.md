@@ -48,8 +48,16 @@ import io, re, sys
 path = sys.argv[1]
 text = io.open(path, encoding='utf-8').read()
 
-PROMO = """
-    # Промо-ролик по прямой ссылке: Telegram забирает видео сам.
+BEGIN = '    # >>> По пути: статика — вставлено скриптом, правится им же'
+END   = '    # <<< По пути: статика'
+
+STATIC = """
+    location = /privacy {
+        alias /opt/vk-rideshare/app/public/privacy/index.html;
+        default_type text/html;
+        add_header Cache-Control "no-cache";
+    }
+
     location = /promo.mp4 {
         alias /opt/vk-rideshare/app/design/promo/video/po-puti-promo-1080.mp4;
         default_type video/mp4;
@@ -57,27 +65,68 @@ PROMO = """
     }
 """
 
-listen = re.search(r'^[ \t]*listen[ \t]+443\b', text, re.M)
-if listen is None:
+APP = """
+    location /app/ {
+        alias /opt/vk-rideshare/app/apps/web/dist/;
+        try_files $uri $uri/ /app/index.html;
+
+        location = /app/index.html {
+            add_header Cache-Control "no-cache";
+        }
+    }
+"""
+
+def match_brace(s, open_at):
+    depth = 0
+    for i in range(open_at, len(s)):
+        if s[i] == '{':
+            depth += 1
+        elif s[i] == '}':
+            depth -= 1
+            if depth == 0:
+                return i
+    return None
+
+def cut(s, start, end):
+    while end < len(s) and s[end] in ' \t':
+        end += 1
+    if end < len(s) and s[end] == '\n':
+        end += 1
+    return s[:start] + s[end:]
+
+while BEGIN in text and END in text:
+    a = text.index(BEGIN)
+    b = text.index(END, a) + len(END)
+    text = cut(text, a, b)
+
+for name in ('/privacy', '/promo.mp4'):
+    while True:
+        m = re.search(r'[ \t]*location\s*=\s*' + re.escape(name) + r'\s*\{', text)
+        if m is None:
+            break
+        close = match_brace(text, text.index('{', m.start()))
+        if close is None:
+            break
+        text = cut(text, m.start(), close + 1)
+
+chunk = STATIC if re.search(r'location\s+/app/\s*\{', text) else STATIC + APP
+
+target = None
+for m in re.finditer(r'^[ \t]*server\s*\{', text, re.M):
+    open_at = text.index('{', m.start())
+    close_at = match_brace(text, open_at)
+    if close_at is None:
+        continue
+    if re.search(r'^[ \t]*listen[ \t]+[^\n;]*\b443\b', text[open_at:close_at], re.M):
+        target = close_at
+        break
+
+if target is None:
     print('Не нашёл server-блок с listen 443 — ничего не меняю.')
     raise SystemExit(1)
-if 'location = /promo.mp4' in text:
-    print('Всё уже на месте — ничего не меняю.')
-    raise SystemExit(0)
 
-opened = text.rindex('{', 0, listen.start())
-depth = 0
-for i in range(opened, len(text)):
-    if text[i] == '{':
-        depth += 1
-    elif text[i] == '}':
-        depth -= 1
-        if depth == 0:
-            io.open(path, 'w', encoding='utf-8').write(text[:i] + PROMO + text[i:])
-            print('Добавлено: /promo.mp4')
-            raise SystemExit(0)
-print('Не нашёл конец server-блока — ничего не меняю.')
-raise SystemExit(1)
+io.open(path, 'w', encoding='utf-8').write(text[:target] + BEGIN + chunk + END + "\n" + text[target:])
+print('Готово: статика на месте в server-блоке.')
 PYEOF
 
 if nginx -t; then
@@ -85,9 +134,20 @@ if nginx -t; then
   echo "Готово."
 else
   cp "$BAK" "$CONF"
-  echo "Конфиг не прошёл проверку — вернул как было."
+  echo "Конфиг не прошёл проверку — вернул как было. Пришлите текст ошибки выше."
 fi
 ```
+
+Скрипт ищет нужный `server`-блок разбором блоков, а не ближайшей скобкой.
+Это не придирка: Certbot дописывает `listen 443` в самый конец блока, и
+ближайшей скобкой оказывается скобка последнего `location` — вставка уезжает
+внутрь него. На этом мы уже обожглись: блок `/privacy` встал внутрь
+`location /`, а следующая вставка попыталась лечь внутрь `location = /privacy`,
+где вложенность запрещена, и `nginx -t` отказал.
+
+Скрипт сначала убирает свои прежние вставки — в том числе уехавшие не туда, —
+и только потом добавляет заново. Поэтому запускать его можно сколько угодно
+раз, и он же чинит последствия старых версий.
 
 ### 1.3. Проверить
 
