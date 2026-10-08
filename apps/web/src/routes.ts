@@ -42,6 +42,7 @@ export const PANEL = {
   MY: 'my',
   PROFILE: 'profile',
   USER: 'user',
+  MODERATION: 'moderation',
 } as const;
 
 export const MODAL = {
@@ -67,6 +68,7 @@ export const routes: RouteWithoutRoot[] = [
 
   { path: '/profile', view: VIEW.PROFILE, panel: PANEL.PROFILE },
   { path: '/profile/user/:userId', view: VIEW.PROFILE, panel: PANEL.USER },
+  { path: '/profile/reports', view: VIEW.PROFILE, panel: PANEL.MODERATION },
 ];
 
 export const router = createHashRouter(routes);

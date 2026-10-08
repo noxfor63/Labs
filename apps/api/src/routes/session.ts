@@ -10,6 +10,7 @@ import {
 } from '@vk-rideshare/shared';
 
 import { ApiError } from '../lib/errors.js';
+import { isModerator } from '../lib/moderation.js';
 import { blockedError, principalWhere } from '../lib/principal.js';
 import { parseWith } from '../lib/validate.js';
 import { toUserPublic } from '../lib/serializers.js';
@@ -48,7 +49,7 @@ function privacyAcceptedIso(user: Pick<User, 'privacyAcceptedAt'>): string | nul
   return user.privacyAcceptedAt === null ? null : user.privacyAcceptedAt.toISOString();
 }
 
-export const sessionRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPluginAsync => {
+export const sessionRoutes = ({ prisma, env, writeRateLimit }: RouteDeps): FastifyPluginAsync => {
   return async (fastify) => {
     /**
      * Состояние сессии, ничего не создавая.
@@ -62,7 +63,7 @@ export const sessionRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlu
         where: principalWhere(request.principal),
       });
       if (user === null) {
-        return { user: null, privacyAcceptedAt: null };
+        return { user: null, privacyAcceptedAt: null, isModerator: false };
       }
       /*
        * Закрытый доступ сообщается уже здесь, на первом запросе.
@@ -75,7 +76,11 @@ export const sessionRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlu
       if (user.blockedAt !== null) {
         throw blockedError();
       }
-      return { user: toUserPublic(user), privacyAcceptedAt: privacyAcceptedIso(user) };
+      return {
+        user: toUserPublic(user),
+        privacyAcceptedAt: privacyAcceptedIso(user),
+        isModerator: isModerator(request.principal, env),
+      };
     });
 
     fastify.post(
@@ -178,7 +183,11 @@ export const sessionRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlu
           update,
         });
 
-        return { user: toUserPublic(user), privacyAcceptedAt: privacyAcceptedIso(user) };
+        return {
+          user: toUserPublic(user),
+          privacyAcceptedAt: privacyAcceptedIso(user),
+          isModerator: isModerator(principal, env),
+        };
       },
     );
   };

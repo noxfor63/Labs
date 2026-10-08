@@ -23,6 +23,8 @@ export type SessionState = {
    * а не после, и выполнить это можно только так: сначала спросить.
    */
   needsPrivacyConsent: boolean;
+  /** Показывать ли экран разбора жалоб. Решает сервер, не клиент. */
+  isModerator: boolean;
   reload: () => void;
   /** Принять политику и завести сессию. Бросает ApiRequestError. */
   acceptPrivacy: () => Promise<void>;
@@ -38,6 +40,7 @@ const SessionContext = createContext<SessionState>({
   isLoading: true,
   error: null,
   needsPrivacyConsent: false,
+  isModerator: false,
   reload: () => undefined,
   acceptPrivacy: () => Promise.resolve(),
   savePhone: () => Promise.resolve(),
@@ -76,7 +79,10 @@ async function profileBody(): Promise<Record<string, unknown>> {
  * требовал, поэтому ведём себя как раньше. Как только сервер обновится,
  * ветка перестанет срабатывать сама.
  */
-async function readSessionState(): Promise<{ privacyAcceptedAt: string | null }> {
+async function readSessionState(): Promise<{
+  privacyAcceptedAt: string | null;
+  isModerator?: boolean;
+}> {
   try {
     return await api.getSession();
   } catch (error) {
@@ -93,6 +99,7 @@ export function SessionProvider({ children }: { children: ReactNode }): ReactNod
     isLoading: true,
     error: null,
     needsPrivacyConsent: false,
+    isModerator: false,
   });
   const [attempt, setAttempt] = useState(0);
 
@@ -117,6 +124,7 @@ export function SessionProvider({ children }: { children: ReactNode }): ReactNod
             isLoading: false,
             error: null,
             needsPrivacyConsent: true,
+            isModerator: false,
           });
           return;
         }
@@ -128,6 +136,7 @@ export function SessionProvider({ children }: { children: ReactNode }): ReactNod
             isLoading: false,
             error: null,
             needsPrivacyConsent: false,
+            isModerator: response.isModerator,
           });
         }
       } catch (error) {
@@ -138,6 +147,7 @@ export function SessionProvider({ children }: { children: ReactNode }): ReactNod
           user: null,
           isLoading: false,
           needsPrivacyConsent: false,
+          isModerator: false,
           error:
             error instanceof ApiRequestError
               ? error
@@ -159,6 +169,7 @@ export function SessionProvider({ children }: { children: ReactNode }): ReactNod
       isLoading: false,
       error: null,
       needsPrivacyConsent: false,
+      isModerator: response.isModerator,
     });
   }, []);
 

@@ -37,6 +37,7 @@ import { useSession } from './lib/SessionContext.js';
 import { ReportModal } from './modals/ReportModal.js';
 import { ReviewModal } from './modals/ReviewModal.js';
 import { CreatePanel } from './panels/CreatePanel.js';
+import { ModerationPanel } from './panels/ModerationPanel.js';
 import { MyPanel } from './panels/MyPanel.js';
 import { ProfilePanel } from './panels/ProfilePanel.js';
 import { SearchPanel } from './panels/SearchPanel.js';
@@ -252,6 +253,7 @@ export function App(): ReactNode {
           <View id={VIEW.PROFILE} activePanel={activePanel ?? PANEL.PROFILE}>
             <ProfilePanel id={PANEL.PROFILE} view={VIEW.PROFILE} />
             <UserPanel id={PANEL.USER} view={VIEW.PROFILE} />
+            <ModerationPanel id={PANEL.MODERATION} view={VIEW.PROFILE} />
           </View>
         </Epic>
       </SplitCol>

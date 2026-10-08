@@ -119,6 +119,14 @@ export type UserPublic = z.infer<typeof userPublicSchema>;
 export const sessionResponseSchema = z.object({
   user: userPublicSchema,
   /**
+   * Доступен ли этому человеку разбор жалоб.
+   *
+   * Поле ответа сессии, а не UserPublic: право разбирать жалобы — дело
+   * между человеком и сервисом, остальным участникам поездки знать, кто
+   * тут модератор, незачем.
+   */
+  isModerator: z.boolean(),
+  /**
    * Когда человек принял политику конфиденциальности. ISO-строка либо null.
    *
    * Поле живёт в ответе сессии, а не в UserPublic: дата согласия — дело
@@ -139,6 +147,7 @@ export type SessionResponse = z.infer<typeof sessionResponseSchema>;
 export const sessionStateSchema = z.object({
   user: userPublicSchema.nullable(),
   privacyAcceptedAt: z.string().nullable(),
+  isModerator: z.boolean(),
 });
 export type SessionState = z.infer<typeof sessionStateSchema>;
 
@@ -355,6 +364,69 @@ export const createReportSchema = z
     path: ['comment'],
   });
 export type CreateReportInput = z.input<typeof createReportSchema>;
+
+/**
+ * Жалоба глазами того, кто её разбирает.
+ *
+ * Кроме самой жалобы здесь то, ради чего её открывают: текст, на который
+ * пожаловались, и автор этого текста. Разбирать по идентификатору
+ * невозможно — смотрят всегда на содержимое.
+ */
+export const moderationReportSchema = z.object({
+  id: z.string(),
+  target: reportTargetSchema,
+  targetId: z.string(),
+  reason: reportReasonSchema,
+  comment: z.string().nullable(),
+  status: reportStatusSchema,
+  createdAt: z.string(),
+  reporter: userPublicSchema,
+  /** Автор контента; null — контента уже нет. */
+  owner: userPublicSchema.nullable(),
+  /** У автора уже закрыт доступ. */
+  ownerBlocked: z.boolean(),
+  /** Сам контент, несколькими строками. */
+  content: z.string(),
+});
+export type ModerationReport = z.infer<typeof moderationReportSchema>;
+
+export const moderationListResponseSchema = z.object({
+  items: z.array(moderationReportSchema),
+  /** Сколько жалоб ждёт разбора — для отметки в профиле. */
+  newCount: z.number().int(),
+});
+export type ModerationListResponse = z.infer<typeof moderationListResponseSchema>;
+
+/**
+ * Что сделать с жалобой.
+ *
+ * Лестница из четырёх ступеней, а не набор флажков: нарушения нет →
+ * удалить контент → удалить и закрыть доступ → вернуть доступ, если
+ * закрыли зря.
+ */
+export const MODERATION_ACTION = {
+  DISMISS: 'DISMISS',
+  REMOVE: 'REMOVE',
+  BLOCK: 'BLOCK',
+  UNBLOCK: 'UNBLOCK',
+} as const;
+export type ModerationAction = (typeof MODERATION_ACTION)[keyof typeof MODERATION_ACTION];
+export const MODERATION_ACTIONS = [
+  MODERATION_ACTION.DISMISS,
+  MODERATION_ACTION.REMOVE,
+  MODERATION_ACTION.BLOCK,
+  MODERATION_ACTION.UNBLOCK,
+] as const;
+
+export const moderationActionSchema = z.object({
+  action: z.enum(MODERATION_ACTIONS),
+});
+export type ModerationActionInput = z.infer<typeof moderationActionSchema>;
+
+export const moderationListQuerySchema = z.object({
+  /** Без параметра — только новые: разбирают их, а не историю. */
+  status: reportStatusSchema.optional(),
+});
 
 export const reportSchema = z.object({
   id: z.string(),

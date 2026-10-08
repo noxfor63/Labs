@@ -68,7 +68,7 @@ describe('согласие с политикой конфиденциально�
     const response = await get();
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ user: null, privacyAcceptedAt: null });
+    expect(response.json()).toEqual({ user: null, privacyAcceptedAt: null, isModerator: false });
     expect(await stored()).toBeNull();
   });
 

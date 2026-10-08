@@ -1,4 +1,5 @@
 import { PRIVACY_POLICY_URL, formatPhone, normalizePhone } from '@vk-rideshare/shared';
+import { Icon28ReportOutline } from '@vkontakte/icons';
 import { useActiveVkuiLocation, useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import {
   Avatar,
@@ -9,7 +10,9 @@ import {
   Panel,
   PanelHeader,
   PanelSpinner,
+  Counter,
   Placeholder,
+  SimpleCell,
   Subhead,
   Title,
 } from '@vkontakte/vkui';
@@ -148,6 +151,18 @@ export function ProfilePanel({ id, view }: { id: string; view: string }): ReactN
         />
       )}
 
+      {/*
+        Вход в разбор жалоб. Видно только тому, кого назвали в
+        MODERATOR_IDS, и решает это сервер: клиент получает готовый
+        признак в ответе сессии, а не вычисляет его сам.
+
+        Счётчик здесь не случайно: оповестить владельца нечем — сервер не
+        достаёт до Telegram, почта не настроена. Единственное место, где
+        жалоба может попасться на глаза, — приложение, которое он и так
+        открывает.
+      */}
+      {session.isModerator && <ModerationCell />}
+
       <Group header={<Header size="s">О приложении</Header>}>
         <Div style={{ color: 'var(--vkui--color_text_secondary)' }}>
           По пути — договаривайтесь о поездке напрямую и оставляйте отзывы после неё.
@@ -171,5 +186,41 @@ export function ProfilePanel({ id, view }: { id: string; view: string }): ReactN
         </Div>
       </Group>
     </Panel>
+  );
+}
+
+/**
+ * Строка «Жалобы» со счётчиком новых.
+ *
+ * Отдельным компонентом, чтобы запрос уходил только у того, кому экран
+ * доступен: внутри обычного профиля он был бы в дереве у всех и слал бы
+ * 403 при каждом открытии вкладки.
+ */
+function ModerationCell(): ReactNode {
+  const routeNavigator = useRouteNavigator();
+  const loader = useCallback(
+    (signal: AbortSignal) => api.moderationReports('NEW', signal),
+    [],
+  );
+  const { data } = useAsync(loader);
+  const pending = data?.newCount ?? 0;
+
+  return (
+    <Group>
+      <SimpleCell
+        before={<Icon28ReportOutline />}
+        // Счётчик заметным, а не серой цифрой: ради того, чтобы жалоба
+        // попалась на глаза, экран и делался.
+        indicator={
+          pending === 0 ? 'нет новых' : <Counter mode="primary">{pending}</Counter>
+        }
+        subtitle="Разбор жалоб на контент"
+        onClick={() => {
+          void routeNavigator.push('/profile/reports');
+        }}
+      >
+        Жалобы
+      </SimpleCell>
+    </Group>
   );
 }

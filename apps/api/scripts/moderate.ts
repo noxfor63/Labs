@@ -14,6 +14,7 @@
  *   npm run moderate -w @vk-rideshare/api -- --dismiss <id> — нарушения нет
  *   npm run moderate -w @vk-rideshare/api -- --block <userId>
  *   npm run moderate -w @vk-rideshare/api -- --unblock <userId>
+ *   npm run moderate -w @vk-rideshare/api -- --who <имя>    — чей это id
  *
  * Идентификатор жалобы можно набирать не целиком: подходит любой
  * однозначный кусок, и в списке для этого напечатан короткий хвост.
@@ -22,10 +23,22 @@
  */
 import process from 'node:process';
 
-import { REPORT_REASON_LABEL, REPORT_TARGET } from '@vk-rideshare/shared';
+import { REPORT_REASON_LABEL } from '@vk-rideshare/shared';
 
 import { prisma } from '../src/db.js';
-import { recalculateRating } from '../src/lib/participants.js';
+import { describeTarget, removeContent, setBlocked } from '../src/lib/moderation.js';
+
+/*
+ * `npm run moderate | head` закрывает канал на середине вывода, и Node
+ * отвечает на это стектрейсом EPIPE. Для команды, которую читают глазами
+ * и обрезают head'ом, это шум, а не ошибка.
+ */
+process.stdout.on('error', (error: NodeJS.ErrnoException) => {
+  if (error.code === 'EPIPE') {
+    process.exit(0);
+  }
+  throw error;
+});
 
 type Flag =
   | { kind: 'list'; all: boolean }
@@ -33,10 +46,11 @@ type Flag =
   | { kind: 'remove'; id: string }
   | { kind: 'dismiss'; id: string }
   | { kind: 'block'; id: string }
-  | { kind: 'unblock'; id: string };
+  | { kind: 'unblock'; id: string }
+  | { kind: 'who'; id: string };
 
 function parseArgs(argv: string[]): Flag {
-  const withValue = ['show', 'remove', 'dismiss', 'block', 'unblock'] as const;
+  const withValue = ['show', 'remove', 'dismiss', 'block', 'unblock', 'who'] as const;
   for (const name of withValue) {
     const index = argv.indexOf(`--${name}`);
     if (index !== -1) {
@@ -73,68 +87,6 @@ async function findReport(fragment: string) {
   return matches[0]!;
 }
 
-/** Текст, на который пожаловались, и его автор. */
-async function describeTarget(
-  target: string,
-  targetId: string,
-): Promise<{ owner: string; ownerId: string | null; body: string }> {
-  if (target === REPORT_TARGET.TRIP) {
-    const trip = await prisma.trip.findUnique({
-      where: { id: targetId },
-      include: { author: true },
-    });
-    if (trip === null) {
-      return { owner: '—', ownerId: null, body: 'объявление уже удалено' };
-    }
-    return {
-      owner: fullName(trip.author),
-      ownerId: trip.authorId,
-      body: [
-        `${trip.fromCity} → ${trip.toCity}, ${when(trip.departAt)}, ${trip.priceRub} ₽`,
-        trip.fromPoint === null ? null : `откуда: ${trip.fromPoint}`,
-        trip.toPoint === null ? null : `куда: ${trip.toPoint}`,
-        trip.carModel === null ? null : `машина: ${trip.carModel}`,
-        trip.comment === null ? null : `комментарий: ${trip.comment}`,
-      ]
-        .filter((line) => line !== null)
-        .join('\n    '),
-    };
-  }
-
-  if (target === REPORT_TARGET.REVIEW) {
-    const review = await prisma.review.findUnique({
-      where: { id: targetId },
-      include: { author: true, target: true },
-    });
-    if (review === null) {
-      return { owner: '—', ownerId: null, body: 'отзыв уже удалён' };
-    }
-    return {
-      owner: fullName(review.author),
-      ownerId: review.authorId,
-      body: `оценка ${review.rating} о ${fullName(review.target)}: ${review.text ?? 'без текста'}`,
-    };
-  }
-
-  const user = await prisma.user.findUnique({ where: { id: targetId } });
-  if (user === null) {
-    return { owner: '—', ownerId: null, body: 'профиль удалён' };
-  }
-  return {
-    owner: fullName(user),
-    ownerId: user.id,
-    body: [
-      `имя: ${fullName(user)}`,
-      user.city === null ? null : `город: ${user.city}`,
-      user.phone === null ? null : `телефон: ${user.phone}`,
-      user.photoUrl === null ? null : `фото: ${user.photoUrl}`,
-      user.blockedAt === null ? null : `доступ закрыт ${when(user.blockedAt)}`,
-    ]
-      .filter((line) => line !== null)
-      .join('\n    '),
-  };
-}
-
 async function list(all: boolean): Promise<void> {
   const reports = await prisma.report.findMany({
     where: all ? {} : { status: 'NEW' },
@@ -149,18 +101,23 @@ async function list(all: boolean): Promise<void> {
   }
 
   for (const report of reports) {
-    const about = await describeTarget(report.target, report.targetId);
+    const about = await describeTarget(prisma, report.target, report.targetId);
     console.log('');
     console.log(
       `${shortId(report.id)}  ${when(report.createdAt)}  ${report.status}  (${report.id})`,
     );
-    console.log(`  ${report.target} ${report.targetId} — ${about.owner}`);
+    console.log(
+      `  ${report.target} ${report.targetId} — ${about.owner === null ? '—' : fullName(about.owner)}` +
+        (about.owner?.blockedAt == null ? '' : ' (доступ закрыт)'),
+    );
     console.log(`  причина: ${REPORT_REASON_LABEL[report.reason]}`);
     if (report.comment !== null) {
       console.log(`  пояснение: ${report.comment}`);
     }
     console.log(`  пожаловался: ${fullName(report.reporter)} (${report.reporterId})`);
-    console.log(`    ${about.body}`);
+    for (const line of about.body.split('\n')) {
+      console.log(`    ${line}`);
+    }
   }
 
   console.log('');
@@ -169,8 +126,14 @@ async function list(all: boolean): Promise<void> {
 
 async function show(prefix: string): Promise<void> {
   const report = await findReport(prefix);
-  const about = await describeTarget(report.target, report.targetId);
-  console.log(JSON.stringify({ report, content: about }, null, 2));
+  const about = await describeTarget(prisma, report.target, report.targetId);
+  console.log(
+    JSON.stringify(
+      { report, owner: about.owner, content: about.body.split('\n') },
+      (_key, value) => (typeof value === 'bigint' ? value.toString() : value),
+      2,
+    ),
+  );
 }
 
 /**
@@ -182,21 +145,7 @@ async function show(prefix: string): Promise<void> {
 async function remove(prefix: string): Promise<void> {
   const report = await findReport(prefix);
 
-  if (report.target === REPORT_TARGET.TRIP) {
-    await prisma.trip.delete({ where: { id: report.targetId } }).catch(() => {
-      console.log('Объявления уже нет — отмечаю жалобу разобранной.');
-    });
-  } else if (report.target === REPORT_TARGET.REVIEW) {
-    const review = await prisma.review.findUnique({ where: { id: report.targetId } });
-    if (review !== null) {
-      // Рейтинг адресата пересчитывается тут же: удалённый отзыв не должен
-      // продолжать влиять на среднюю оценку.
-      await prisma.$transaction(async (tx) => {
-        await tx.review.delete({ where: { id: review.id } });
-        await recalculateRating(tx, review.targetId);
-      });
-    }
-  } else {
+  if (!(await removeContent(prisma, report.target, report.targetId))) {
     console.log('У профиля удалять нечего. Если нарушение в профиле — закройте доступ:');
     console.log(`  npm run moderate -w @vk-rideshare/api -- --block ${report.targetId}`);
     return;
@@ -212,11 +161,47 @@ async function dismiss(prefix: string): Promise<void> {
   console.log(`Жалоба ${shortId(report.id)} закрыта: нарушения нет.`);
 }
 
-async function setBlocked(userId: string, blocked: boolean): Promise<void> {
-  const user = await prisma.user.update({
-    where: { id: userId },
-    data: { blockedAt: blocked ? new Date() : null },
+/**
+ * Кто есть кто: внутренний id для `--block` и идентификатор площадки для
+ * MODERATOR_IDS.
+ *
+ * Нужно ровно для настройки экрана жалоб: свой идентификатор ВКонтакте
+ * владелец иначе ищет в адресе профиля, а чужой — никак.
+ */
+async function who(query: string): Promise<void> {
+  const users = await prisma.user.findMany({
+    where: {
+      OR: [
+        { firstName: { contains: query, mode: 'insensitive' } },
+        { lastName: { contains: query, mode: 'insensitive' } },
+        { id: { contains: query } },
+      ],
+    },
+    take: 20,
+    orderBy: { createdAt: 'asc' },
   });
+
+  if (users.length === 0) {
+    console.log(`Никого похожего на «${query}» не нашлось.`);
+    return;
+  }
+
+  for (const user of users) {
+    const platform =
+      user.vkUserId !== null
+        ? `VK:${user.vkUserId}`
+        : user.tgUserId !== null
+          ? `TG:${user.tgUserId}`
+          : '—';
+    console.log(
+      `${fullName(user)}  id: ${user.id}  для MODERATOR_IDS: ${platform}` +
+        (user.blockedAt === null ? '' : '  (доступ закрыт)'),
+    );
+  }
+}
+
+async function block(userId: string, blocked: boolean): Promise<void> {
+  const user = await setBlocked(prisma, userId, blocked);
   console.log(
     blocked
       ? `Доступ закрыт: ${fullName(user)} (${user.id}).`
@@ -240,10 +225,13 @@ try {
       await dismiss(flag.id);
       break;
     case 'block':
-      await setBlocked(flag.id, true);
+      await block(flag.id, true);
       break;
     case 'unblock':
-      await setBlocked(flag.id, false);
+      await block(flag.id, false);
+      break;
+    case 'who':
+      await who(flag.id);
       break;
   }
 } catch (error) {

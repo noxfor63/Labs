@@ -58,6 +58,9 @@ export const reportRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlug
               reporterId,
               target: input.target,
               targetId: input.targetId,
+              // Автора запоминаем сейчас: после разбора контента уже не
+              // будет, а значит, и вычислить его будет не из чего.
+              ownerId,
               reason: input.reason,
               comment: input.comment,
             },

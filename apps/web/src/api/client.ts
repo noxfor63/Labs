@@ -10,6 +10,9 @@ import {
   type CreateReportInput,
   type CreateReviewInput,
   type CreateTripInput,
+  type ModerationAction,
+  type ModerationListResponse,
+  type ModerationReport,
   type MyRequestDto,
   type ReportDto,
   type ReviewableParticipants,
@@ -197,4 +200,20 @@ export const api = {
   /** Жалоба на объявление, отзыв или профиль. */
   createReport: (input: CreateReportInput): Promise<ReportDto> =>
     request('/reports', { method: 'POST', body: input }),
+
+  /** Жалобы для разбора. Доступно только администрации — см. MODERATOR_IDS. */
+  moderationReports: (
+    status: string | undefined,
+    signal?: AbortSignal,
+  ): Promise<ModerationListResponse> =>
+    request('/moderation/reports', {
+      ...(status === undefined ? {} : { query: { status } }),
+      ...(signal === undefined ? {} : { signal }),
+    }),
+
+  moderateReport: (reportId: string, action: ModerationAction): Promise<ModerationReport> =>
+    request(`/moderation/reports/${encodeURIComponent(reportId)}`, {
+      method: 'POST',
+      body: { action },
+    }),
 };

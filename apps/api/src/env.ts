@@ -87,6 +87,19 @@ const envSchema = z
      * после разбора.
      */
     AUTH_DEBUG: z.string().default(''),
+    /**
+     * Кому в приложении виден разбор жалоб.
+     *
+     * Перечисляются идентификаторы площадок через запятую: `VK:123`,
+     * `TG:456` либо просто `123` — это ВКонтакте. Именно идентификаторы
+     * площадок, а не внутренние id: внутренний появляется только после
+     * первого запуска, а права нужны ещё до него, и в `.env` его
+     * неоткуда взять.
+     *
+     * Пусто — экран жалоб не виден никому, и это верное значение по
+     * умолчанию: права, выданные по забывчивости, никто не отзывает.
+     */
+    MODERATOR_IDS: z.string().default(''),
   })
   .transform((raw) => {
     const isProduction = raw.NODE_ENV === 'production';
@@ -106,12 +119,46 @@ const envSchema = z
       mockLaunchParams: isProduction ? '' : raw.VK_MOCK_LAUNCH_PARAMS,
       /** Включена ли площадка Telegram. */
       telegramEnabled: raw.TELEGRAM_BOT_TOKEN !== '',
+      /** Кому доступен разбор жалоб. Пустой список — никому. */
+      moderators: parseModerators(raw.MODERATOR_IDS),
     };
   })
   .refine((value) => !value.isProduction || value.VK_APP_SECRET.length > 0, {
     message: 'VK_APP_SECRET обязателен при NODE_ENV=production',
     path: ['VK_APP_SECRET'],
   });
+
+export type ModeratorRef = {
+  platform: 'VK' | 'TG';
+  platformUserId: bigint;
+};
+
+/**
+ * `VK:123,TG:456,789` → список идентификаторов площадок.
+ *
+ * Непонятная запись молча пропускается, а не роняет сервер: ошибка в
+ * этой переменной не должна мешать приложению работать — она всего лишь
+ * не даст кому-то доступ к разбору жалоб. Обратное поведение означало
+ * бы, что опечатка в необязательной настройке кладёт сервис целиком.
+ */
+function parseModerators(raw: string): ModeratorRef[] {
+  const result: ModeratorRef[] = [];
+  for (const piece of raw.split(',')) {
+    const entry = piece.trim();
+    if (entry === '') {
+      continue;
+    }
+    const match = /^(?:(VK|TG):)?(\d{1,19})$/i.exec(entry);
+    if (match === null) {
+      continue;
+    }
+    result.push({
+      platform: (match[1] ?? 'VK').toUpperCase() === 'TG' ? 'TG' : 'VK',
+      platformUserId: BigInt(match[2]!),
+    });
+  }
+  return result;
+}
 
 export type AppEnv = z.infer<typeof envSchema>;
 
