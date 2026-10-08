@@ -1,5 +1,6 @@
 import { createHashRouter, type RouteWithoutRoot } from '@vkontakte/vk-mini-apps-router';
 
+import { stripLaunchHash } from './platform/launch-hash.js';
 import { captureTelegramLaunch } from './platform/telegram-launch.js';
 
 /*
@@ -20,6 +21,15 @@ import { captureTelegramLaunch } from './platform/telegram-launch.js';
  * переносе строки.
  */
 captureTelegramLaunch();
+
+/*
+ * Следом — всё остальное, что могло оказаться в хеше: метка источника из
+ * рекламной ссылки, параметр запуска Telegram без initData. Для
+ * маршрутизатора это несуществующий маршрут, то есть пустой экран. Порядок
+ * важен: перехват выше забирает свой хеш сам, и только то, что осталось
+ * после него, можно считать мусором.
+ */
+stripLaunchHash();
 
 /**
  * Разделы приложения — отдельные view, чтобы у каждой вкладки была своя
