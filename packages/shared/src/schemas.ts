@@ -17,6 +17,9 @@ import { normalizePhone } from './phone.js';
 import {
   ERROR_CODE,
   LIMITS,
+  REPORT_REASONS,
+  REPORT_STATUSES,
+  REPORT_TARGETS,
   REQUEST_STATUSES,
   TRIP_ROLES,
   TRIP_STATUSES,
@@ -51,6 +54,9 @@ const optionalText = (max: number) =>
 export const tripRoleSchema = z.enum(TRIP_ROLES);
 export const tripStatusSchema = z.enum(TRIP_STATUSES);
 export const requestStatusSchema = z.enum(REQUEST_STATUSES);
+export const reportTargetSchema = z.enum(REPORT_TARGETS);
+export const reportReasonSchema = z.enum(REPORT_REASONS);
+export const reportStatusSchema = z.enum(REPORT_STATUSES);
 
 /* ──────────────────────────── ошибки ──────────────────────────── */
 
@@ -323,3 +329,40 @@ export const reviewableParticipantSchema = z.object({
   alreadyReviewedUserIds: z.array(userIdSchema),
 });
 export type ReviewableParticipants = z.infer<typeof reviewableParticipantSchema>;
+
+/* ───────────────────────── жалобы ───────────────────────── */
+
+/**
+ * Жалоба на пользовательский контент.
+ *
+ * `targetId` — идентификатор объявления, отзыва или человека; какой
+ * именно, говорит `target`. Проверять существование объекта схема не
+ * может и не должна: это дело сервера, который всё равно обращается в
+ * базу.
+ *
+ * При причине «Другое» комментарий обязателен. Без этого правила пункт
+ * превращался бы в жалобу без содержания, разобрать которую нельзя.
+ */
+export const createReportSchema = z
+  .object({
+    target: reportTargetSchema,
+    targetId: z.string().min(1, 'Нужен идентификатор объекта жалобы'),
+    reason: reportReasonSchema,
+    comment: optionalText(LIMITS.REPORT_COMMENT_MAX),
+  })
+  .refine((value) => value.reason !== 'OTHER' || value.comment !== null, {
+    message: 'Опишите, что не так — иначе жалобу не разобрать',
+    path: ['comment'],
+  });
+export type CreateReportInput = z.input<typeof createReportSchema>;
+
+export const reportSchema = z.object({
+  id: z.string(),
+  target: reportTargetSchema,
+  targetId: z.string(),
+  reason: reportReasonSchema,
+  comment: z.string().nullable(),
+  status: reportStatusSchema,
+  createdAt: z.string(),
+});
+export type ReportDto = z.infer<typeof reportSchema>;

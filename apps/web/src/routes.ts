@@ -46,6 +46,11 @@ export const PANEL = {
 
 export const MODAL = {
   REVIEW: 'review',
+  /**
+   * Жалоба. Маршрута у неё нет: открывается с полудюжины экранов в трёх
+   * разделах, и состояние лежит в ReportContext — см. комментарий там.
+   */
+  REPORT: 'report',
 } as const;
 
 export const routes: RouteWithoutRoot[] = [

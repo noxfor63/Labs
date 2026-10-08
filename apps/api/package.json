@@ -16,6 +16,7 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
+    "moderate": "tsx scripts/moderate.ts",
     "db:studio": "prisma studio",
     "db:url": "tsx scripts/db-url.ts",
     "gen:launch-params": "tsx scripts/gen-launch-params.ts"

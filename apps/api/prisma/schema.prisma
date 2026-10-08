@@ -35,6 +35,29 @@ enum RequestStatus {
   CANCELLED
 }
 
+/// На что пожаловались: объявление, отзыв или профиль.
+enum ReportTarget {
+  TRIP
+  REVIEW
+  USER
+}
+
+/// Причина жалобы. Список закрытый — в интерфейсе это набор пунктов.
+enum ReportReason {
+  SPAM
+  OFFENSIVE
+  FRAUD
+  PERSONAL_DATA
+  OTHER
+}
+
+/// Что с жалобой сделала администрация сервиса.
+enum ReportStatus {
+  NEW
+  REVIEWED
+  DISMISSED
+}
+
 /// Человек, независимо от площадки, через которую он пришёл.
 ///
 /// Первичный ключ суррогатный, а не идентификатор площадки. Так сделано
@@ -61,6 +84,12 @@ model User {
   /// Когда принята политика конфиденциальности. Пусто — согласия не было,
   /// и тогда у человека не должно быть ни этой строки, ни чего-либо ещё.
   privacyAcceptedAt DateTime?
+  /// Когда администрация закрыла доступ за нарушение правил. Пусто — доступ открыт.
+  ///
+  /// Отметка, а не удаление: удалив нарушителя, мы потеряли бы и причину,
+  /// и возможность узнать его при следующем заходе — идентификатор
+  /// площадки у него тот же.
+  blockedAt         DateTime?
   ratingAvg   Float    @default(0)
   ratingCount Int      @default(0)
   createdAt   DateTime @default(now())
@@ -69,6 +98,7 @@ model User {
   requests       TripRequest[]
   reviewsWritten Review[]      @relation("ReviewAuthor")
   reviewsGot     Review[]      @relation("ReviewTarget")
+  reportsSent    Report[]      @relation("ReportAuthor")
 
   @@map("users")
 }
@@ -136,4 +166,43 @@ model Review {
   @@unique([tripId, authorId, targetId])
   @@index([targetId])
   @@map("reviews")
+}
+
+/// Жалоба на пользовательский контент.
+///
+/// Контент в сервисе появляется сразу, без предварительной проверки:
+/// поездку нужно найти сегодня, а не после модерации. Значит, проверка
+/// постфактум, и у неё должен быть вход — эта таблица.
+///
+/// `targetId` нарочно не внешний ключ. Жалоба указывает на один из трёх
+/// разных объектов, и ссылку на «одну из трёх таблиц» в реляционной
+/// схеме выразить нечем: пришлось бы либо держать три необязательные
+/// колонки, либо три таблицы. Платим за это тем, что удалённое
+/// объявление оставляет жалобу с повисшим идентификатором — и это
+/// скорее хорошо: запись о разборе должна переживать удаление того, на
+/// что жаловались.
+///
+/// Уникальность по (кто, на что) превращает повторное нажатие в 409
+/// вместо горы одинаковых строк. Накрутить счётчик жалобами с разных
+/// аккаунтов она не мешает, но счётчик тут ничего и не решает: жалобы
+/// разбирает человек.
+model Report {
+  id         String       @id @default(cuid())
+  reporterId String
+  target     ReportTarget
+  /// Идентификатор поездки, отзыва или пользователя — смотря что в target.
+  targetId   String
+  reason     ReportReason
+  /// Пояснение от пожаловавшегося. Обязательно при причине OTHER — проверяется Zod-схемой.
+  comment    String?
+  status     ReportStatus @default(NEW)
+  createdAt  DateTime     @default(now())
+
+  reporter User @relation("ReportAuthor", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@unique([reporterId, target, targetId])
+  /// Рабочий запрос администрации: «что нового, по времени».
+  @@index([status, createdAt])
+  @@index([target, targetId])
+  @@map("reports")
 }

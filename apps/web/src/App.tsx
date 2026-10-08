@@ -1,3 +1,4 @@
+import { ERROR_CODE, SUPPORT_EMAIL } from '@vk-rideshare/shared';
 import {
   Icon28AddCircleOutline,
   Icon28ListOutline,
@@ -31,7 +32,9 @@ import { useState, type ReactNode } from 'react';
 import { getPlatform } from './platform/index.js';
 import { ErrorState } from './components/ErrorState.js';
 import { PrivacyGate } from './components/PrivacyGate.js';
+import { useReport } from './lib/ReportContext.js';
 import { useSession } from './lib/SessionContext.js';
+import { ReportModal } from './modals/ReportModal.js';
 import { ReviewModal } from './modals/ReviewModal.js';
 import { CreatePanel } from './panels/CreatePanel.js';
 import { MyPanel } from './panels/MyPanel.js';
@@ -87,15 +90,27 @@ export function App(): ReactNode {
   const routeNavigator = useRouteNavigator();
   const routerPopout = usePopout();
   const session = useSession();
+  const report = useReport();
 
+  /*
+   * Два источника открытой модалки: маршрут (отзыв) и контекст (жалоба).
+   * Жалоба — поверх: её открывают с уже открытого экрана, и маршрут при
+   * этом не меняется.
+   */
+  const isReportOpen = report.subject !== null;
   const modals = (
     <ModalRoot
-      activeModal={activeModal ?? null}
+      activeModal={isReportOpen ? MODAL.REPORT : activeModal ?? null}
       onClose={() => {
+        if (isReportOpen) {
+          report.close();
+          return;
+        }
         void routeNavigator.hideModal();
       }}
     >
       <ReviewModal id={MODAL.REVIEW} />
+      <ReportModal id={MODAL.REPORT} />
     </ModalRoot>
   );
 
@@ -123,6 +138,40 @@ export function App(): ReactNode {
    */
   if (session.needsPrivacyConsent) {
     return <PrivacyGate />;
+  }
+
+  /*
+   * Закрытый доступ — отдельный экран, а не «не получилось загрузить».
+   * Человек должен понимать, что произошло и куда писать, если считает
+   * решение ошибкой: без этого блокировка выглядит как поломка, и к нам
+   * придут через отзывы в магазине приложений, а не на почту.
+   */
+  if (session.error !== null && session.error.code === ERROR_CODE.ACCESS_BLOCKED) {
+    return (
+      <SplitLayout center>
+        <SplitCol width="100%" maxWidth={560} stretchedOnMobile autoSpaced>
+          <View activePanel="blocked">
+            <Panel id="blocked">
+              <PanelHeader>По пути</PanelHeader>
+              <Group>
+                <Placeholder title="Доступ закрыт">{session.error.message}</Placeholder>
+                <Div>
+                  <Button
+                    size="l"
+                    stretched
+                    mode="secondary"
+                    href={`mailto:${SUPPORT_EMAIL}`}
+                  >
+                    Написать нам
+                  </Button>
+                </Div>
+                <Footer>Если считаете решение ошибкой — напишите, разберёмся.</Footer>
+              </Group>
+            </Panel>
+          </View>
+        </SplitCol>
+      </SplitLayout>
+    );
   }
 
   if (session.error !== null) {

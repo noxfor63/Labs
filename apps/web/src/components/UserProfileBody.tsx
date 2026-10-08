@@ -1,8 +1,21 @@
-import type { UserProfileResponse } from '@vk-rideshare/shared';
-import { Avatar, Caption, Div, Footer, Group, Header, Headline, SimpleCell } from '@vkontakte/vkui';
+import { REPORT_TARGET, type UserProfileResponse } from '@vk-rideshare/shared';
+import { Icon16ReportOutline } from '@vkontakte/icons';
+import {
+  Avatar,
+  Caption,
+  Div,
+  Footer,
+  Group,
+  Header,
+  Headline,
+  IconButton,
+  SimpleCell,
+} from '@vkontakte/vkui';
 import type { ReactNode } from 'react';
 
 import { formatDate, formatRating, fullName } from '../lib/format.js';
+import { useReport } from '../lib/ReportContext.js';
+import { useSession } from '../lib/SessionContext.js';
 import { RatingBadge } from './RatingBadge.js';
 
 /** Общая «начинка» профиля: свой и чужой отличаются только шапкой. */
@@ -13,6 +26,9 @@ export function UserProfileBody({
   profile: UserProfileResponse;
   onOpenUser?: (userId: string) => void;
 }): ReactNode {
+  const report = useReport();
+  const session = useSession();
+
   return (
     <>
       <Group>
@@ -50,7 +66,40 @@ export function UserProfileBody({
               before={<Avatar size={40} src={review.author.photoUrl ?? undefined} />}
               subtitle={review.text ?? 'Без комментария'}
               after={
-                <RatingBadge ratingAvg={review.rating} ratingCount={1} withCount={false} />
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--app-space-2)',
+                  }}
+                >
+                  <RatingBadge ratingAvg={review.rating} ratingCount={1} withCount={false} />
+                  {/*
+                    Жалоба на отзыв стоит здесь, а не на отдельном экране
+                    отзыва: экрана отзыва нет, а текст написан человеком и
+                    опубликован сразу. Свой отзыв обжаловать нечего, и
+                    кнопки у него нет.
+                  */}
+                  {session.user?.id !== review.author.id && (
+                    <IconButton
+                      aria-label="Пожаловаться на отзыв"
+                      onClick={(event) => {
+                        // Строка целиком ведёт в профиль автора; нажатие
+                        // по кнопке не должно заодно открывать его.
+                        event.stopPropagation();
+                        report.open({
+                          target: REPORT_TARGET.REVIEW,
+                          id: review.id,
+                          title: `Отзыв от ${fullName(review.author)}`,
+                        });
+                      }}
+                    >
+                      <Icon16ReportOutline
+                        style={{ color: 'var(--vkui--color_icon_secondary)' }}
+                      />
+                    </IconButton>
+                  )}
+                </div>
               }
               {...(onOpenUser === undefined
                 ? {}

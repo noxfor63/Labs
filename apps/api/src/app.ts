@@ -11,6 +11,7 @@ import { env as defaultEnv, type AppEnv } from './env.js';
 import { ApiError } from './lib/errors.js';
 import { authPlugin } from './plugins/auth.js';
 import { meRoutes } from './routes/me.js';
+import { reportRoutes } from './routes/reports.js';
 import { requestRoutes } from './routes/requests.js';
 import { reviewRoutes } from './routes/reviews.js';
 import { sessionRoutes } from './routes/session.js';
@@ -158,6 +159,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
       await api.register(meRoutes(deps));
       await api.register(reviewRoutes(deps));
       await api.register(userRoutes(deps));
+      await api.register(reportRoutes(deps));
     },
     { prefix: '/api' },
   );

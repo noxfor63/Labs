@@ -1,3 +1,5 @@
+import { REPORT_TARGET } from '@vk-rideshare/shared';
+import { Icon16ReportOutline } from '@vkontakte/icons';
 import {
   useActiveVkuiLocation,
   useParams,
@@ -5,6 +7,7 @@ import {
 } from '@vkontakte/vk-mini-apps-router';
 import {
   Avatar,
+  Button,
   Div,
   Group,
   Panel,
@@ -23,6 +26,8 @@ import { ErrorState } from '../components/ErrorState.js';
 import { UserProfileBody } from '../components/UserProfileBody.js';
 import { fullName } from '../lib/format.js';
 import { useAsync } from '../lib/useAsync.js';
+import { useReport } from '../lib/ReportContext.js';
+import { useSession } from '../lib/SessionContext.js';
 
 export function UserPanel({ id, view }: { id: string; view: string }): ReactNode {
   const routeNavigator = useRouteNavigator();
@@ -30,6 +35,8 @@ export function UserPanel({ id, view }: { id: string; view: string }): ReactNode
   const params = useParams<'userId'>();
   const userId = params?.userId ?? '';
   const isActive = activeView === view && activePanel === id && userId !== '';
+  const report = useReport();
+  const session = useSession();
 
   const loader = useCallback(
     (signal: AbortSignal) => api.getUser(userId, signal),
@@ -90,6 +97,33 @@ export function UserPanel({ id, view }: { id: string; view: string }): ReactNode
           </div>
         </Div>
         <ContactButtons user={data.user} />
+
+        {/*
+          Имя, фотография и номер телефона в карточке — тоже то, что
+          человек указал сам. Жалоба на профиль нужна в первую очередь
+          из-за номера: его видит каждый, кто откроет карточку, и чужой
+          номер здесь — это уже чужие персональные данные.
+        */}
+        {session.user?.id !== data.user.id && (
+          <Div>
+            <Button
+              size="s"
+              mode="tertiary"
+              appearance="neutral"
+              before={<Icon16ReportOutline />}
+              style={{ paddingLeft: 0 }}
+              onClick={() => {
+                report.open({
+                  target: REPORT_TARGET.USER,
+                  id: data.user.id,
+                  title: `Профиль: ${fullName(data.user)}`,
+                });
+              }}
+            >
+              Пожаловаться на профиль
+            </Button>
+          </Div>
+        )}
       </Group>
 
       <UserProfileBody profile={data} />

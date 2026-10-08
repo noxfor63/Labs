@@ -42,6 +42,77 @@ export const REQUEST_STATUSES = [
   REQUEST_STATUS.CANCELLED,
 ] as const;
 
+/* ──────────────────────────── жалобы ──────────────────────────── */
+
+/**
+ * На что жалуются.
+ *
+ * Перечисление повторяет то, что человек может написать сам:
+ * объявление (точки, машина, комментарий), отзыв и профиль
+ * (имя, фото, номер телефона). Сообщение к отклику видит только автор
+ * поездки, и жаловаться на него он может как на профиль — отдельного
+ * вида для этого нет сознательно, иначе в списке появился бы пункт,
+ * непонятный всем остальным.
+ */
+export const REPORT_TARGET = {
+  TRIP: 'TRIP',
+  REVIEW: 'REVIEW',
+  USER: 'USER',
+} as const;
+export type ReportTarget = (typeof REPORT_TARGET)[keyof typeof REPORT_TARGET];
+export const REPORT_TARGETS = [
+  REPORT_TARGET.TRIP,
+  REPORT_TARGET.REVIEW,
+  REPORT_TARGET.USER,
+] as const;
+
+/** Причина жалобы. Набор закрытый: это список в интерфейсе, а не свободный ввод. */
+export const REPORT_REASON = {
+  /** Реклама, повторы, не относящееся к поездкам. */
+  SPAM: 'SPAM',
+  /** Оскорбления, вражда, непристойности. */
+  OFFENSIVE: 'OFFENSIVE',
+  /** Обман: несуществующая поездка, вымогательство, подмена условий. */
+  FRAUD: 'FRAUD',
+  /** Чужие персональные данные в тексте. */
+  PERSONAL_DATA: 'PERSONAL_DATA',
+  /** Остальное — обязателен комментарий. */
+  OTHER: 'OTHER',
+} as const;
+export type ReportReason = (typeof REPORT_REASON)[keyof typeof REPORT_REASON];
+export const REPORT_REASONS = [
+  REPORT_REASON.SPAM,
+  REPORT_REASON.OFFENSIVE,
+  REPORT_REASON.FRAUD,
+  REPORT_REASON.PERSONAL_DATA,
+  REPORT_REASON.OTHER,
+] as const;
+
+/** Что с жалобой сделала администрация сервиса. */
+export const REPORT_STATUS = {
+  /** Поступила, ещё не разобрана. */
+  NEW: 'NEW',
+  /** Разобрана, контент удалён или исправлен. */
+  REVIEWED: 'REVIEWED',
+  /** Разобрана, нарушения нет. */
+  DISMISSED: 'DISMISSED',
+} as const;
+export type ReportStatus = (typeof REPORT_STATUS)[keyof typeof REPORT_STATUS];
+export const REPORT_STATUSES = [
+  REPORT_STATUS.NEW,
+  REPORT_STATUS.REVIEWED,
+  REPORT_STATUS.DISMISSED,
+] as const;
+
+/** Подписи причин для интерфейса. Лежат рядом с кодами, чтобы пункт без подписи не появился незаметно. */
+export const REPORT_REASON_LABEL: Record<ReportReason, string> = {
+  SPAM: 'Реклама или спам',
+  OFFENSIVE: 'Оскорбления или непристойности',
+  FRAUD: 'Обман или мошенничество',
+  PERSONAL_DATA: 'Чужие персональные данные',
+  OTHER: 'Другое',
+};
+
 /** Заголовок, которым фронтенд ВКонтакте передаёт исходную query-строку запуска. */
 export const LAUNCH_PARAMS_HEADER = 'x-launch-params';
 
@@ -56,6 +127,14 @@ export const TELEGRAM_INIT_DATA_HEADER = 'x-telegram-init-data';
  * три места не должны. Страница отдаётся тем же nginx, что и API.
  */
 export const PRIVACY_POLICY_URL = 'https://vk-rideshare.duckdns.org/privacy';
+
+/**
+ * Адрес для обращений: вопросы по данным и спор о закрытом доступе.
+ *
+ * Тот же, что в политике конфиденциальности, и лежит рядом с ней не
+ * случайно: два разных адреса в двух местах — это один устаревший.
+ */
+export const SUPPORT_EMAIL = 'noxfor63@gmail.com';
 
 /** Launch-параметры старше суток считаются протухшими. */
 export const LAUNCH_PARAMS_MAX_AGE_SECONDS = 24 * 60 * 60;
@@ -80,6 +159,8 @@ export const LIMITS = {
   COMMENT_MAX: 1_000,
   REQUEST_MESSAGE_MAX: 500,
   REVIEW_TEXT_MAX: 1_000,
+  /** Пояснение к жалобе. Короче отзыва: это записка модератору, а не текст для людей. */
+  REPORT_COMMENT_MAX: 500,
   PAGE_SIZE_DEFAULT: 20,
   PAGE_SIZE_MAX: 50,
 } as const;
@@ -123,6 +204,12 @@ export const ERROR_CODE = {
   NOT_A_PARTICIPANT: 'NOT_A_PARTICIPANT',
   ALREADY_REVIEWED: 'ALREADY_REVIEWED',
   SELF_REVIEW: 'SELF_REVIEW',
+  /** Жалоба на свой же контент. */
+  SELF_REPORT: 'SELF_REPORT',
+  /** На этот объект этот человек уже жаловался. */
+  ALREADY_REPORTED: 'ALREADY_REPORTED',
+  /** Доступ закрыт администрацией за нарушение правил. */
+  ACCESS_BLOCKED: 'ACCESS_BLOCKED',
   /** Человек ещё не принял политику конфиденциальности. */
   PRIVACY_NOT_ACCEPTED: 'PRIVACY_NOT_ACCEPTED',
   RATE_LIMITED: 'RATE_LIMITED',

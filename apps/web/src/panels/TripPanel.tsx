@@ -1,5 +1,10 @@
-import type { TripRequestDto } from '@vk-rideshare/shared';
-import { Icon20CarOutline, Icon20PhoneOutline, Icon20PlaceOutline } from '@vkontakte/icons';
+import { REPORT_TARGET, type TripRequestDto } from '@vk-rideshare/shared';
+import {
+  Icon16ReportOutline,
+  Icon20CarOutline,
+  Icon20PhoneOutline,
+  Icon20PlaceOutline,
+} from '@vkontakte/icons';
 import { useActiveVkuiLocation, useParams, useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import {
   Avatar,
@@ -39,6 +44,7 @@ import {
 } from '../lib/format.js';
 import { useAsync } from '../lib/useAsync.js';
 import { useNow } from '../lib/useNow.js';
+import { useReport } from '../lib/ReportContext.js';
 import { useSnackbar } from '../lib/SnackbarContext.js';
 import { sectionPrefix } from '../routes.js';
 
@@ -59,6 +65,7 @@ export function TripPanel({ id, view }: { id: string; view: string }): ReactNode
   // которая действительно открыта, и только с непустым id.
   const isActive = activeView === view && activePanel === id && tripId !== '';
   const snackbar = useSnackbar();
+  const report = useReport();
   const now = useNow();
 
   const [message, setMessage] = useState('');
@@ -251,6 +258,33 @@ export function TripPanel({ id, view }: { id: string; view: string }): ReactNode
           <Footer>
             {trip.status === 'COMPLETED' ? 'Поездка завершена' : 'Поездка отменена'}
           </Footer>
+        )}
+
+        {/*
+          Жалоба на объявление: точки, машина и комментарий — текст,
+          написанный человеком, и его никто не проверял до публикации.
+          Кнопка намеренно серая и в конце карточки: это выход на крайний
+          случай, а не одно из обычных действий.
+        */}
+        {!trip.isAuthor && (
+          <Div>
+            <Button
+              size="s"
+              mode="tertiary"
+              appearance="neutral"
+              before={<Icon16ReportOutline />}
+              style={{ paddingLeft: 0 }}
+              onClick={() => {
+                report.open({
+                  target: REPORT_TARGET.TRIP,
+                  id: trip.id,
+                  title: `Объявление ${trip.fromCity} → ${trip.toCity}`,
+                });
+              }}
+            >
+              Пожаловаться на объявление
+            </Button>
+          </Div>
         )}
       </Group>
 

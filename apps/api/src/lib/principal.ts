@@ -12,7 +12,9 @@
  */
 import type { PrismaClient } from '@prisma/client';
 
-import { unauthorized } from './errors.js';
+import { ERROR_CODE } from '@vk-rideshare/shared';
+
+import { ApiError, unauthorized } from './errors.js';
 
 export const PLATFORM = {
   VK: 'VK',
@@ -48,18 +50,6 @@ export function principalWhere(principal: Principal): { vkUserId: bigint } | { t
     : { tgUserId: principal.platformUserId };
 }
 
-/** Внутренний id пользователя или null, если он ещё не заводился. */
-export async function findUserId(
-  prisma: PrismaClient,
-  principal: Principal,
-): Promise<string | null> {
-  const user = await prisma.user.findUnique({
-    where: principalWhere(principal),
-    select: { id: true },
-  });
-  return user?.id ?? null;
-}
-
 /**
  * То же, но для маршрутов, где без пользователя делать нечего.
  *
@@ -71,9 +61,29 @@ export async function requireUserId(
   prisma: PrismaClient,
   principal: Principal,
 ): Promise<string> {
-  const id = await findUserId(prisma, principal);
-  if (id === null) {
+  const user = await prisma.user.findUnique({
+    where: principalWhere(principal),
+    select: { id: true, blockedAt: true },
+  });
+  if (user === null) {
     throw unauthorized('Сессия не инициализирована: сначала POST /api/session');
   }
-  return id;
+  /*
+   * Закрытый доступ проверяется здесь, а не в каждом маршруте: через эту
+   * функцию проходит всё, что вообще требует личности, — и запись, и
+   * чтение своих списков. Забыть проверку в новом маршруте так нельзя.
+   */
+  if (user.blockedAt !== null) {
+    throw blockedError();
+  }
+  return user.id;
+}
+
+/** Один текст на все маршруты: человек должен понимать, что произошло. */
+export function blockedError(): ApiError {
+  return new ApiError(
+    403,
+    ERROR_CODE.ACCESS_BLOCKED,
+    'Доступ к сервису закрыт за нарушение правил',
+  );
 }

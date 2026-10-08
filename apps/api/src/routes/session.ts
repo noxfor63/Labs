@@ -10,7 +10,7 @@ import {
 } from '@vk-rideshare/shared';
 
 import { ApiError } from '../lib/errors.js';
-import { principalWhere } from '../lib/principal.js';
+import { blockedError, principalWhere } from '../lib/principal.js';
 import { parseWith } from '../lib/validate.js';
 import { toUserPublic } from '../lib/serializers.js';
 import type { RouteDeps } from './types.js';
@@ -64,6 +64,17 @@ export const sessionRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlu
       if (user === null) {
         return { user: null, privacyAcceptedAt: null };
       }
+      /*
+       * Закрытый доступ сообщается уже здесь, на первом запросе.
+       *
+       * Иначе заблокированный, у которого ещё нет согласия с политикой,
+       * сначала прошёл бы экран согласия и только потом упёрся бы в отказ
+       * на записи — то есть отдал бы свои данные ради сообщения о том,
+       * что сервис ему закрыт.
+       */
+      if (user.blockedAt !== null) {
+        throw blockedError();
+      }
       return { user: toUserPublic(user), privacyAcceptedAt: privacyAcceptedIso(user) };
     });
 
@@ -75,6 +86,13 @@ export const sessionRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlu
         const principal = request.principal;
 
         const existing = await prisma.user.findUnique({ where: principalWhere(principal) });
+
+        // Закрытый доступ — раньше всего: иначе заблокированный продолжал бы
+        // обновлять свой профиль, и единственное, чего он лишился бы, — это
+        // поездок.
+        if (existing !== null && existing.blockedAt !== null) {
+          throw blockedError();
+        }
 
         /*
          * Главная проверка этого маршрута, и она стоит до любой записи.

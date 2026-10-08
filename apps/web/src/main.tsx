@@ -13,6 +13,7 @@ import '@vkontakte/vkui/dist/vkui.css';
 import './styles/app.css';
 
 import { App } from './App.js';
+import { ReportProvider } from './lib/ReportContext.js';
 import { SessionProvider } from './lib/SessionContext.js';
 import { SnackbarProvider } from './lib/SnackbarContext.js';
 import { getPlatform } from './platform/index.js';
@@ -37,7 +38,9 @@ function Root(): ReactNode {
           <RouterProvider router={router}>
             <SnackbarProvider>
               <SessionProvider>
-                <App />
+                <ReportProvider>
+                  <App />
+                </ReportProvider>
               </SessionProvider>
             </SnackbarProvider>
           </RouterProvider>

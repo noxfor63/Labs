@@ -7,9 +7,11 @@
  * бэкенд, секретные ключи сюда не попадают и попасть не могут.
  */
 import {
+  type CreateReportInput,
   type CreateReviewInput,
   type CreateTripInput,
   type MyRequestDto,
+  type ReportDto,
   type ReviewableParticipants,
   type SessionResponse,
   type SessionState,
@@ -191,4 +193,8 @@ export const api = {
     request(`/users/${encodeURIComponent(userId)}`, {
       ...(signal === undefined ? {} : { signal }),
     }),
+
+  /** Жалоба на объявление, отзыв или профиль. */
+  createReport: (input: CreateReportInput): Promise<ReportDto> =>
+    request('/reports', { method: 'POST', body: input }),
 };
