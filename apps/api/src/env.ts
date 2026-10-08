@@ -120,7 +120,9 @@ const envSchema = z
       /** Включена ли площадка Telegram. */
       telegramEnabled: raw.TELEGRAM_BOT_TOKEN !== '',
       /** Кому доступен разбор жалоб. Пустой список — никому. */
-      moderators: parseModerators(raw.MODERATOR_IDS),
+      moderators: parseModerators(raw.MODERATOR_IDS).ok,
+      /** Записи MODERATOR_IDS, которые не удалось разобрать: о них говорят вслух. */
+      moderatorsRejected: parseModerators(raw.MODERATOR_IDS).rejected,
     };
   })
   .refine((value) => !value.isProduction || value.VK_APP_SECRET.length > 0, {
@@ -136,13 +138,15 @@ export type ModeratorRef = {
 /**
  * `VK:123,TG:456,789` → список идентификаторов площадок.
  *
- * Непонятная запись молча пропускается, а не роняет сервер: ошибка в
- * этой переменной не должна мешать приложению работать — она всего лишь
- * не даст кому-то доступ к разбору жалоб. Обратное поведение означало
- * бы, что опечатка в необязательной настройке кладёт сервис целиком.
+ * Непонятная запись не роняет сервер: ошибка в этой переменной не должна
+ * мешать приложению работать — она всего лишь не даст кому-то доступ к
+ * разбору жалоб. Но и молчать о ней нельзя, иначе «экран не появился»
+ * остаётся без объяснения, поэтому непонятое возвращается отдельным
+ * списком — его называют вслух и при старте, и по команде.
  */
-function parseModerators(raw: string): ModeratorRef[] {
-  const result: ModeratorRef[] = [];
+function parseModerators(raw: string): { ok: ModeratorRef[]; rejected: string[] } {
+  const ok: ModeratorRef[] = [];
+  const rejected: string[] = [];
   for (const piece of raw.split(',')) {
     const entry = piece.trim();
     if (entry === '') {
@@ -150,14 +154,15 @@ function parseModerators(raw: string): ModeratorRef[] {
     }
     const match = /^(?:(VK|TG):)?(\d{1,19})$/i.exec(entry);
     if (match === null) {
+      rejected.push(entry);
       continue;
     }
-    result.push({
+    ok.push({
       platform: (match[1] ?? 'VK').toUpperCase() === 'TG' ? 'TG' : 'VK',
       platformUserId: BigInt(match[2]!),
     });
   }
-  return result;
+  return { ok, rejected };
 }
 
 export type AppEnv = z.infer<typeof envSchema>;

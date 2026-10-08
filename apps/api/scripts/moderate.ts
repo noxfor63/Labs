@@ -15,6 +15,7 @@
  *   npm run moderate -w @vk-rideshare/api -- --block <userId>
  *   npm run moderate -w @vk-rideshare/api -- --unblock <userId>
  *   npm run moderate -w @vk-rideshare/api -- --who <имя>    — чей это id
+ *   npm run moderate -w @vk-rideshare/api -- --moderators    — кто видит экран жалоб
  *
  * Идентификатор жалобы можно набирать не целиком: подходит любой
  * однозначный кусок, и в списке для этого напечатан короткий хвост.
@@ -26,6 +27,7 @@ import process from 'node:process';
 import { REPORT_REASON_LABEL } from '@vk-rideshare/shared';
 
 import { prisma } from '../src/db.js';
+import { env } from '../src/env.js';
 import { describeTarget, removeContent, setBlocked } from '../src/lib/moderation.js';
 
 /*
@@ -42,6 +44,7 @@ process.stdout.on('error', (error: NodeJS.ErrnoException) => {
 
 type Flag =
   | { kind: 'list'; all: boolean }
+  | { kind: 'moderators' }
   | { kind: 'show'; id: string }
   | { kind: 'remove'; id: string }
   | { kind: 'dismiss'; id: string }
@@ -60,6 +63,9 @@ function parseArgs(argv: string[]): Flag {
       }
       return { kind: name, id: value };
     }
+  }
+  if (argv.includes('--moderators')) {
+    return { kind: 'moderators' };
   }
   return { kind: 'list', all: argv.includes('--all') };
 }
@@ -162,6 +168,43 @@ async function dismiss(prefix: string): Promise<void> {
 }
 
 /**
+ * Кому доступен экран жалоб — по тому же .env, что читает сервер.
+ *
+ * Нужно потому, что опечатка в MODERATOR_IDS ничем себя не выдаёт:
+ * непонятная запись пропускается молча, экран просто не появляется, и
+ * непонятно, то ли переменная не та, то ли сервер не перезапущен.
+ */
+async function moderators(): Promise<void> {
+  for (const bad of env.moderatorsRejected) {
+    console.log(`«${bad}» — не понял эту запись, она не действует.`);
+    console.log('  Ожидается VK:123456789, TG:123456789 или просто 123456789.');
+  }
+
+  if (env.moderators.length === 0) {
+    console.log('MODERATOR_IDS пуст — экран жалоб не виден никому.');
+    console.log('Свой идентификатор: npm run moderate -w @vk-rideshare/api -- --who <имя>');
+    return;
+  }
+
+  for (const one of env.moderators) {
+    const entry = `${one.platform}:${one.platformUserId}`;
+    const user = await prisma.user.findFirst({
+      where:
+        one.platform === 'VK'
+          ? { vkUserId: one.platformUserId }
+          : { tgUserId: one.platformUserId },
+    });
+    console.log(
+      user === null
+        ? `${entry} — такого пользователя в базе нет (он ещё не запускал приложение — это нормально)`
+        : `${entry} — ${fullName(user)}`,
+    );
+  }
+  console.log('');
+  console.log('Если здесь не то, что в .env, — сервер читает другой файл или не перезапущен.');
+}
+
+/**
  * Кто есть кто: внутренний id для `--block` и идентификатор площадки для
  * MODERATOR_IDS.
  *
@@ -232,6 +275,9 @@ try {
       break;
     case 'who':
       await who(flag.id);
+      break;
+    case 'moderators':
+      await moderators();
       break;
   }
 } catch (error) {
