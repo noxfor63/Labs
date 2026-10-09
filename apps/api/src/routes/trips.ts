@@ -19,7 +19,7 @@ import {
 import { decodeCursor, encodeCursor } from '../lib/cursor.js';
 import { conflict, forbidden, notFound, validationFailed } from '../lib/errors.js';
 import { getParticipants } from '../lib/participants.js';
-import { requireUserId } from '../lib/principal.js';
+import { requireReachableUserId, requireUserId } from '../lib/principal.js';
 import { toTripDetail, toTripRequest, toTripSummary, toUserPublic } from '../lib/serializers.js';
 import { parseWith } from '../lib/validate.js';
 import type { RouteDeps } from './types.js';
@@ -110,7 +110,9 @@ export const tripRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlugin
       { config: writeConfig },
       async (request, reply): Promise<TripSummary> => {
         const input = parseWith(createTripSchema, request.body ?? {});
-        const authorId = await requireUserId(prisma, request.principal);
+        // Поездка без способа связи с автором бесполезна — и вредна:
+        // попутчик найдёт её, напишет в пустоту и уйдёт из приложения.
+        const authorId = await requireReachableUserId(prisma, request.principal);
 
         const trip = await prisma.trip.create({
           data: {
@@ -219,7 +221,8 @@ export const tripRoutes = ({ prisma, writeRateLimit }: RouteDeps): FastifyPlugin
       async (request, reply): Promise<TripRequestDto> => {
         const { id } = parseWith(idParamSchema, request.params);
         const input = parseWith(createTripRequestSchema, request.body ?? {});
-        const userId = await requireUserId(prisma, request.principal);
+        // Отклик — это заявка «позвоните мне». Звонить должно быть куда.
+        const userId = await requireReachableUserId(prisma, request.principal);
 
         const trip = await prisma.trip.findUnique({ where: { id } });
         if (trip === null) {

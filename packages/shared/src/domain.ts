@@ -157,6 +157,27 @@ export function buildTelegramDialogUrl(username: string | null): string | null {
   return /^[A-Za-z0-9_]{5,32}$/.test(clean) ? `https://t.me/${clean}` : null;
 }
 
+/**
+ * С этим человеком нельзя связаться — и он не может ни создать поездку,
+ * ни откликнуться.
+ *
+ * У пришедшего из ВКонтакте всегда есть страница: не оставил номер —
+ * напишут туда. У пришедшего из Telegram такого запасного пути нет.
+ * Диалог открывается только по @username, он есть не у всех, а в России
+ * Telegram работает с перебоями, и договариваться там никто не станет:
+ * звонят. Поэтому для него номер — не пожелание, а условие.
+ *
+ * Правило сформулировано через «нечем связаться», а не через «он из
+ * Telegram»: так оно само собой перестанет срабатывать, если у человека
+ * появится другой способ связи.
+ */
+export function isUnreachable(user: {
+  vkUserId: string | null;
+  phone: string | null;
+}): boolean {
+  return user.vkUserId === null && (user.phone === null || user.phone.trim() === '');
+}
+
 /** Launch-параметры старше суток считаются протухшими. */
 export const LAUNCH_PARAMS_MAX_AGE_SECONDS = 24 * 60 * 60;
 
@@ -231,6 +252,8 @@ export const ERROR_CODE = {
   ALREADY_REPORTED: 'ALREADY_REPORTED',
   /** Доступ закрыт администрацией за нарушение правил. */
   ACCESS_BLOCKED: 'ACCESS_BLOCKED',
+  /** Нет ни одного способа связи: нужен номер телефона. */
+  PHONE_REQUIRED: 'PHONE_REQUIRED',
   /** Человек ещё не принял политику конфиденциальности. */
   PRIVACY_NOT_ACCEPTED: 'PRIVACY_NOT_ACCEPTED',
   RATE_LIMITED: 'RATE_LIMITED',

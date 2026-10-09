@@ -12,7 +12,7 @@
  */
 import type { PrismaClient } from '@prisma/client';
 
-import { ERROR_CODE } from '@vk-rideshare/shared';
+import { ERROR_CODE, isUnreachable } from '@vk-rideshare/shared';
 
 import { ApiError, unauthorized } from './errors.js';
 
@@ -79,6 +79,35 @@ export async function requireUserId(
     throw blockedError();
   }
   return user.id;
+}
+
+/**
+ * То же, но для действий, после которых с человеком должны связаться:
+ * создать поездку и откликнуться на чужую.
+ *
+ * Проверка стоит на сервере, а не только на экране: без неё достаточно
+ * отправить запрос мимо интерфейса, и в ленте появится поездка, автор
+ * которой недоступен. Для попутчика это хуже, чем отсутствие поездки, —
+ * он потратит время на звонок, которого нет.
+ */
+export async function requireReachableUserId(
+  prisma: PrismaClient,
+  principal: Principal,
+): Promise<string> {
+  const id = await requireUserId(prisma, principal);
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id },
+    select: { vkUserId: true, phone: true },
+  });
+
+  if (isUnreachable({ vkUserId: user.vkUserId?.toString() ?? null, phone: user.phone })) {
+    throw new ApiError(
+      403,
+      ERROR_CODE.PHONE_REQUIRED,
+      'Укажите номер телефона в профиле: иначе попутчики не смогут с вами связаться',
+    );
+  }
+  return id;
 }
 
 /** Один текст на все маршруты: человек должен понимать, что произошло. */

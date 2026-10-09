@@ -124,6 +124,16 @@ describe('площадка Telegram', () => {
   });
 
   it('пользователь Telegram создаёт поездку, и её видно из ВКонтакте', async () => {
+    // Номер — условие публикации для пришедшего из Telegram: страницы
+    // ВКонтакте у него нет, и без номера связаться с ним нечем
+    // (см. phone-required.test.ts).
+    await ctx.app.inject({
+      method: 'POST',
+      url: '/api/session',
+      headers: telegramHeaders({ id: TG_ID }),
+      payload: { privacyAccepted: true, phone: '+79990000777' },
+    });
+
     const created = await ctx.app.inject({
       method: 'POST',
       url: '/api/trips',

@@ -1,4 +1,9 @@
-import { PRIVACY_POLICY_URL, formatPhone, normalizePhone } from '@vk-rideshare/shared';
+import {
+  PRIVACY_POLICY_URL,
+  formatPhone,
+  isUnreachable,
+  normalizePhone,
+} from '@vk-rideshare/shared';
 import { Icon28ReportOutline } from '@vkontakte/icons';
 import { useActiveVkuiLocation, useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import {
@@ -11,6 +16,7 @@ import {
   PanelHeader,
   PanelSpinner,
   Counter,
+  Caption,
   Placeholder,
   SimpleCell,
   Subhead,
@@ -95,6 +101,8 @@ export function ProfilePanel({ id, view }: { id: string; view: string }): ReactN
     );
   }
 
+  const needsPhone = isUnreachable(session.user);
+
   return (
     <Panel id={id}>
       <PanelHeader>Профиль</PanelHeader>
@@ -112,9 +120,27 @@ export function ProfilePanel({ id, view }: { id: string; view: string }): ReactN
       </Group>
 
       <Group header={<Header size="s">Связь</Header>}>
+        {/*
+          Предупреждение показывается, пока номера нет. Это не украшение:
+          без него человек из Telegram узнаёт о требовании только когда
+          нажмёт «Опубликовать» и получит ошибку.
+        */}
+        {needsPhone && (
+          <Div>
+            <div className="app-tile">
+              <Subhead weight="2">Без номера не получится создать поездку</Subhead>
+              <Caption level="1" style={{ color: 'var(--vkui--color_text_secondary)' }}>
+                И откликнуться тоже. В Telegram с вами иначе не свяжутся — попутчики
+                звонят.
+              </Caption>
+            </div>
+          </Div>
+        )}
+
         <PhoneField
           value={phone}
           error={phoneError}
+          required={session.user.vkUserId === null}
           onChange={(value) => {
             setPhone(value);
             setPhoneError(undefined);

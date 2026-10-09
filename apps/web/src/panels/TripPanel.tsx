@@ -1,4 +1,4 @@
-import { REPORT_TARGET, type TripRequestDto } from '@vk-rideshare/shared';
+import { REPORT_TARGET, isUnreachable, type TripRequestDto } from '@vk-rideshare/shared';
 import {
   Icon16ReportOutline,
   Icon20CarOutline,
@@ -45,6 +45,7 @@ import {
 import { useAsync } from '../lib/useAsync.js';
 import { useNow } from '../lib/useNow.js';
 import { useReport } from '../lib/ReportContext.js';
+import { useSession } from '../lib/SessionContext.js';
 import { useSnackbar } from '../lib/SnackbarContext.js';
 import { sectionPrefix } from '../routes.js';
 
@@ -66,6 +67,7 @@ export function TripPanel({ id, view }: { id: string; view: string }): ReactNode
   const isActive = activeView === view && activePanel === id && tripId !== '';
   const snackbar = useSnackbar();
   const report = useReport();
+  const session = useSession();
   const now = useNow();
 
   const [message, setMessage] = useState('');
@@ -171,6 +173,12 @@ export function TripPanel({ id, view }: { id: string; view: string }): ReactNode
     trip.isAuthor &&
     trip.status === 'ACTIVE' &&
     (trip.author.phone === null || trip.author.phone === '');
+  /*
+   * Отклик — это заявка «позвоните мне», и звонить должно быть куда.
+   * Для пришедшего из ВКонтакте запасной путь есть всегда: автор откроет
+   * его страницу. Для пришедшего из Telegram — нет.
+   */
+  const viewerUnreachable = session.user !== null && isUnreachable(session.user);
   const canRespond =
     !trip.isAuthor &&
     trip.status === 'ACTIVE' &&
@@ -430,6 +438,30 @@ export function TripPanel({ id, view }: { id: string; view: string }): ReactNode
             <Footer>
               {`Вы откликнулись · ${REQUEST_STATUS_LABEL[trip.myRequest.status] ?? trip.myRequest.status}`}
             </Footer>
+          ) : canRespond && viewerUnreachable ? (
+            <Div>
+              <div
+                className="app-tile"
+                style={{ display: 'flex', alignItems: 'center', gap: 'var(--app-space-3)' }}
+              >
+                <Icon20PhoneOutline style={{ color: 'var(--vkui--color_icon_secondary)' }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <Subhead weight="2">Сначала укажите номер телефона</Subhead>
+                  <Caption level="1" style={{ color: 'var(--vkui--color_text_secondary)' }}>
+                    Автор поездки перезвонит вам — другого способа связаться у него нет
+                  </Caption>
+                </div>
+                <Button
+                  size="s"
+                  mode="secondary"
+                  onClick={() => {
+                    void routeNavigator.push('/profile');
+                  }}
+                >
+                  Указать
+                </Button>
+              </div>
+            </Div>
           ) : canRespond ? (
             <>
               <FormItem top="Сообщение автору (необязательно)">

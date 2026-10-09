@@ -17,11 +17,19 @@ export function PhoneField({
   onChange,
   error,
   top = 'Мобильный телефон',
+  required = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   error?: string | undefined;
   top?: string;
+  /**
+   * Номер обязателен — у человека нет другого способа связи.
+   *
+   * Меняет только подпись под полем: проверка живёт там, где известно,
+   * что именно человек делает, а запрет — на сервере.
+   */
+  required?: boolean;
 }): ReactNode {
   const [isFetching, setIsFetching] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
@@ -48,7 +56,13 @@ export function PhoneField({
     <FormItem
       top={top}
       status={error === undefined ? 'default' : 'error'}
-      bottom={error ?? hint ?? 'Нужен, чтобы попутчики могли позвонить. Можно не указывать'}
+      bottom={
+        error ??
+        hint ??
+        (required
+          ? 'Обязательно: по номеру с вами свяжутся. Другого способа у попутчиков нет'
+          : 'Нужен, чтобы попутчики могли позвонить. Можно не указывать')
+      }
     >
       <Input
         type="tel"

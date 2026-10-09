@@ -7,6 +7,7 @@ import {
   formatPhone,
   isAllowedDepartTime,
   isKnownRoute,
+  isUnreachable,
   normalizePhone,
   type CreateTripInput,
   type TripRole,
@@ -92,7 +93,7 @@ const emptyForm = (phone: string): FormState => ({
 });
 
 /** Локальная проверка — чтобы не гонять заведомо плохую форму на сервер. */
-function validate(form: FormState): { errors: FieldErrors; departAt: Date | null } {
+function validate(form: FormState, phoneRequired: boolean): { errors: FieldErrors; departAt: Date | null } {
   const errors: FieldErrors = {};
 
   if (form.fromCity === '') {
@@ -132,7 +133,17 @@ function validate(form: FormState): { errors: FieldErrors; departAt: Date | null
     errors['seatsTotal'] = `От ${LIMITS.SEATS_MIN} до ${LIMITS.SEATS_MAX}`;
   }
 
-  if (form.phone.trim() !== '' && normalizePhone(form.phone) === null) {
+  if (form.phone.trim() === '') {
+    /*
+     * Пустое поле — ошибка только для того, кому иначе не дозвониться.
+     * У пришедшего из ВКонтакте остаётся страница, у пришедшего из
+     * Telegram — ничего: диалог там открывается не у всех, а в России
+     * Telegram работает с перебоями, и договариваются звонком.
+     */
+    if (phoneRequired) {
+      errors['phone'] = 'Без номера попутчики не смогут с вами связаться';
+    }
+  } else if (normalizePhone(form.phone) === null) {
     errors['phone'] = 'Укажите мобильный номер в виде +7 999 123-45-67';
   }
 
@@ -174,8 +185,16 @@ export function CreatePanel({ id }: { id: string }): ReactNode {
     });
   };
 
+  /*
+   * Считается по полю формы, а не по сохранённому профилю: номер можно
+   * стереть прямо здесь, и тогда человек снова остаётся без связи.
+   */
+  const phoneRequired =
+    session.user !== null &&
+    isUnreachable({ vkUserId: session.user.vkUserId, phone: form.phone });
+
   const submit = async (): Promise<void> => {
-    const { errors: found, departAt } = validate(form);
+    const { errors: found, departAt } = validate(form, phoneRequired);
     setErrors(found);
     if (Object.keys(found).length > 0 || departAt === null) {
       return;
@@ -406,6 +425,7 @@ export function CreatePanel({ id }: { id: string }): ReactNode {
         <PhoneField
           value={form.phone}
           error={errors['phone']}
+          required={session.user !== null && session.user.vkUserId === null}
           onChange={(value) => {
             update('phone', value);
           }}

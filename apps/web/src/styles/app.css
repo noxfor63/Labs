@@ -22,6 +22,9 @@
    * активные фильтры, — а основной текст остаётся на токенах VKUI.
    */
   --app-accent: #e2613c;
+  /* Наведение темнее основного, нажатие — ещё темнее: так же ведёт себя сам VKUI. */
+  --app-accent-hover: #cc5533;
+  --app-accent-active: #b54a2c;
   --app-accent-tint: #fdede7;
   /* Поверх акцентной заливки в светлой теме — белый. */
   --app-on-accent: #ffffff;
@@ -82,6 +85,37 @@
   --vkui--color_stroke_accent: var(--app-accent);
   --vkui--color_stroke_accent_themed: var(--app-accent);
   --vkui--color_accent_blue: var(--app-accent);
+
+  /*
+   * Состояния наведения и нажатия.
+   *
+   * У VKUI на каждый акцентный токен есть пара «--hover» и «--active», и
+   * в них зашит синий. Пока их не переопределить, коралловая кнопка под
+   * курсором становится синей — на телефоне этого не видно вовсе, а на
+   * vk.com в браузере видно каждому. Мы на это уже наступили: в
+   * комментарии выше было написано «перечислены все акцентные токены до
+   * одного», и это было правдой только для обычного состояния.
+   */
+  --vkui--color_background_accent--hover: var(--app-accent-hover);
+  --vkui--color_background_accent--active: var(--app-accent-active);
+  --vkui--color_background_accent_themed--hover: var(--app-accent-hover);
+  --vkui--color_background_accent_themed--active: var(--app-accent-active);
+  --vkui--color_background_accent_alternative--hover: var(--app-accent-hover);
+  --vkui--color_background_accent_alternative--active: var(--app-accent-active);
+  --vkui--color_text_accent--hover: var(--app-accent-hover);
+  --vkui--color_text_accent--active: var(--app-accent-active);
+  --vkui--color_text_accent_themed--hover: var(--app-accent-hover);
+  --vkui--color_text_accent_themed--active: var(--app-accent-active);
+  --vkui--color_icon_accent--hover: var(--app-accent-hover);
+  --vkui--color_icon_accent--active: var(--app-accent-active);
+  --vkui--color_icon_accent_themed--hover: var(--app-accent-hover);
+  --vkui--color_icon_accent_themed--active: var(--app-accent-active);
+  --vkui--color_stroke_accent--hover: var(--app-accent-hover);
+  --vkui--color_stroke_accent--active: var(--app-accent-active);
+  --vkui--color_stroke_accent_themed--hover: var(--app-accent-hover);
+  --vkui--color_stroke_accent_themed--active: var(--app-accent-active);
+  --vkui--color_accent_blue--hover: var(--app-accent-hover);
+  --vkui--color_accent_blue--active: var(--app-accent-active);
 }
 
 /*
@@ -97,6 +131,8 @@
 .vkui--vkIOS--dark,
 .vkui--vkCom--dark {
   --app-accent: #ff9a76;
+  --app-accent-hover: #ffb094;
+  --app-accent-active: #ffc4ad;
   --app-accent-tint: #3a241d;
   --app-on-accent: #19191a;
 
@@ -113,6 +149,28 @@
   --vkui--color_stroke_accent: var(--app-accent);
   --vkui--color_stroke_accent_themed: var(--app-accent);
   --vkui--color_accent_blue: var(--app-accent);
+
+  /* Те же пары состояний, что и в светлой теме: иначе синий вернётся здесь. */
+  --vkui--color_background_accent--hover: var(--app-accent-hover);
+  --vkui--color_background_accent--active: var(--app-accent-active);
+  --vkui--color_background_accent_themed--hover: var(--app-accent-hover);
+  --vkui--color_background_accent_themed--active: var(--app-accent-active);
+  --vkui--color_background_accent_alternative--hover: var(--app-accent-hover);
+  --vkui--color_background_accent_alternative--active: var(--app-accent-active);
+  --vkui--color_text_accent--hover: var(--app-accent-hover);
+  --vkui--color_text_accent--active: var(--app-accent-active);
+  --vkui--color_text_accent_themed--hover: var(--app-accent-hover);
+  --vkui--color_text_accent_themed--active: var(--app-accent-active);
+  --vkui--color_icon_accent--hover: var(--app-accent-hover);
+  --vkui--color_icon_accent--active: var(--app-accent-active);
+  --vkui--color_icon_accent_themed--hover: var(--app-accent-hover);
+  --vkui--color_icon_accent_themed--active: var(--app-accent-active);
+  --vkui--color_stroke_accent--hover: var(--app-accent-hover);
+  --vkui--color_stroke_accent--active: var(--app-accent-active);
+  --vkui--color_stroke_accent_themed--hover: var(--app-accent-hover);
+  --vkui--color_stroke_accent_themed--active: var(--app-accent-active);
+  --vkui--color_accent_blue--hover: var(--app-accent-hover);
+  --vkui--color_accent_blue--active: var(--app-accent-active);
 }
 
 /* ─────────────── карточка ─────────────── */
