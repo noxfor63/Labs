@@ -35,6 +35,8 @@ export type Principal = {
     firstName: string;
     lastName: string;
     photoUrl: string | null;
+    /** @username без «@»; null — его нет. Только у Telegram. */
+    username: string | null;
   };
 };
 

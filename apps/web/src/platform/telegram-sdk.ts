@@ -24,6 +24,8 @@ type TelegramWebApp = {
   ready?: () => void;
   expand?: () => void;
   colorScheme?: string;
+  /** Открыть ссылку t.me средствами клиента, а не во встроенном браузере. */
+  openTelegramLink?: (url: string) => void;
   onEvent?: (event: string, handler: () => void) => void;
   offEvent?: (event: string, handler: () => void) => void;
 };
@@ -139,4 +141,26 @@ export function subscribeTelegramColorScheme(
     media?.removeEventListener('change', fromDevice);
     app?.offEvent?.('themeChanged', fromApp);
   };
+}
+
+/**
+ * Открыть диалог Telegram средствами самого клиента.
+ *
+ * Обычная ссылка `t.me/…` внутри мини-приложения открывается во
+ * встроенном браузере: человек видит веб-страницу с кнопкой «Open in
+ * Telegram» и лишним шагом. `openTelegramLink` отдаёт её клиенту, и
+ * диалог открывается сразу.
+ *
+ * Возвращает false, если сделать это нечем: скрипт Telegram не
+ * загрузился или мы вообще не в Telegram (ссылку тогда открывает
+ * браузер — там она работает как обычная). Вызывающий по этому ответу
+ * решает, гасить ли штатный переход по ссылке.
+ */
+export function openTelegramDialog(url: string): boolean {
+  const open = webApp()?.openTelegramLink;
+  if (open === undefined) {
+    return false;
+  }
+  open(url);
+  return true;
 }

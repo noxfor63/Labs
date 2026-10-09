@@ -27,6 +27,7 @@ const trip = (overrides: Partial<TripSummary> = {}): TripSummary => ({
     id: 'u-1',
     vkUserId: '1000001',
     tgUserId: null,
+    tgUsername: null,
     firstName: 'Анна',
     lastName: 'Ковалёва',
     photoUrl: null,

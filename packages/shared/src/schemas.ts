@@ -105,6 +105,14 @@ export const userPublicSchema = z.object({
    */
   vkUserId: platformUserIdSchema.nullable(),
   tgUserId: platformUserIdSchema.nullable(),
+  /**
+   * @username в Telegram, если он у человека есть.
+   *
+   * Нужен ровно для одного — открыть диалог: по числовому идентификатору
+   * он не открывается. Имя публичное: его видит любой, кому человек
+   * написал, так что в публичном профиле ему место.
+   */
+  tgUsername: z.string().nullable(),
   firstName: z.string(),
   lastName: z.string(),
   photoUrl: z.string().nullable(),

@@ -1,75 +1,116 @@
 import {
   buildTelUrl,
+  buildTelegramDialogUrl,
   formatPhone,
   type UserPublic,
-} from "@vk-rideshare/shared";
-import { Icon20LogoVk, Icon20PhoneOutline } from "@vkontakte/icons";
-import { Button, Caption, Div } from "@vkontakte/vkui";
-import type { ReactNode } from "react";
+} from '@vk-rideshare/shared';
+import { Icon20LogoVk, Icon20PhoneOutline, Icon20Send } from '@vkontakte/icons';
+import { Button, Caption, Div } from '@vkontakte/vkui';
+import type { ReactNode } from 'react';
 
-import { buildProfileUrl } from "../vk/bridge.js";
+import { openTelegramDialog } from '../platform/telegram-sdk.js';
+import { buildProfileUrl } from '../vk/bridge.js';
 
 /**
- * Способы связаться с человеком: страница ВКонтакте и звонок.
+ * Способы связаться с человеком: звонок, страница ВКонтакте, диалог в
+ * Telegram.
  *
- * Кнопки рядом и равной ширины. Если номер не указан — «Позвонить» нет
- * вовсе, а кнопка профиля занимает всю строку: неактивная кнопка, по
- * которой нельзя понять почему, раздражает сильнее, чем её отсутствие.
+ * Звонок стоит отдельной строкой и во всю ширину не из эстетики:
+ * договариваются о поездке почти всегда по телефону, а переписка —
+ * запасной путь для тех, кто номер не указал.
  *
- * Диалог ВКонтакте открыть напрямую нельзя — подтверждённого метода в
- * VK Bridge нет, поэтому ведём на профиль.
+ * Кнопки, которой не на что вести, нет вовсе: нет номера — нет
+ * «Позвонить», нет страницы ВКонтакте — нет «Профиля», нет @username в
+ * Telegram — нет «Написать». Неактивная кнопка, по которой нельзя
+ * понять почему, раздражает сильнее, чем её отсутствие.
  */
 export function ContactButtons({ user }: { user: UserPublic }): ReactNode {
   const phone = user.phone !== null && user.phone !== '' ? user.phone : null;
   /*
    * Страница ВКонтакте есть не у всех: пришедший только из Telegram
-   * собеседник её не имеет. Кнопку в таком случае не показываем вовсе —
-   * по той же причине, по которой нет неактивной «Позвонить».
+   * собеседник её не имеет. Диалог Telegram — наоборот.
    */
   const vkUserId = user.vkUserId;
+  const telegramUrl = buildTelegramDialogUrl(user.tgUsername);
+
+  if (phone === null && vkUserId === null && telegramUrl === null) {
+    return null;
+  }
 
   return (
     <Div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        {vkUserId !== null && (
-          <Button
-            size="l"
-            mode="secondary"
-            stretched
-            before={
-              /*
-               * Цвет логотипа ВКонтакте закреплён явно. Иконка рисуется
-               * currentColor, то есть по умолчанию берёт цвет кнопки, а он
-               * у нас коралловый — и фирменный знак чужого бренда
-               * перекрашивался в наш акцент. Токен accent_azure — это
-               * синий ВКонтакте (#07f), и он не входит в набор акцентных,
-               * которые мы переопределяем.
-               */
-              <Icon20LogoVk
-                width={20}
-                height={20}
-                style={{ color: 'var(--vkui--color_accent_azure)' }}
-              />
-            }
-            href={buildProfileUrl(vkUserId)}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Профиль
-          </Button>
-        )}
+      {phone !== null && (
+        <Button
+          size="l"
+          stretched
+          before={<Icon20PhoneOutline />}
+          href={buildTelUrl(phone)}
+        >
+          Позвонить
+        </Button>
+      )}
 
-        {phone !== null && (
-          <Button
-            size="l"
-            stretched
-            before={<Icon20PhoneOutline />}
-            href={buildTelUrl(phone)}
-          >
-            Позвонить
-          </Button>
-        )}
-      </div>
+      {(vkUserId !== null || telegramUrl !== null) && (
+        <div style={{ display: 'flex', gap: 8, marginTop: phone === null ? 0 : 8 }}>
+          {vkUserId !== null && (
+            <Button
+              size="l"
+              mode="secondary"
+              stretched
+              before={
+                /*
+                 * Цвет логотипа ВКонтакте закреплён явно. Иконка рисуется
+                 * currentColor, то есть по умолчанию берёт цвет кнопки, а он
+                 * у нас коралловый — и фирменный знак чужого бренда
+                 * перекрашивался в наш акцент. Токен accent_azure — это
+                 * синий ВКонтакте (#07f), и он не входит в набор акцентных,
+                 * которые мы переопределяем.
+                 */
+                <Icon20LogoVk
+                  width={20}
+                  height={20}
+                  style={{ color: 'var(--vkui--color_accent_azure)' }}
+                />
+              }
+              href={buildProfileUrl(vkUserId)}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Профиль
+            </Button>
+          )}
+
+          {telegramUrl !== null && (
+            <Button
+              size="l"
+              mode="secondary"
+              stretched
+              /*
+                Бумажный самолётик, а не карандаш: логотипа Telegram в
+                наборе иконок ВКонтакте нет по понятным причинам, а
+                самолётик узнаётся как Telegram и без подписи.
+              */
+              before={<Icon20Send />}
+              href={telegramUrl}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(event) => {
+                /*
+                 * Внутри Telegram ссылку открывает сам клиент — иначе
+                 * встроенный браузер покажет веб-страницу t.me с лишней
+                 * кнопкой «Open in Telegram». Не вышло — остаётся обычный
+                 * переход по href, он и так работает.
+                 */
+                if (openTelegramDialog(telegramUrl)) {
+                  event.preventDefault();
+                }
+              }}
+            >
+              Написать
+            </Button>
+          )}
+        </div>
+      )}
 
       {phone !== null && (
         <Caption

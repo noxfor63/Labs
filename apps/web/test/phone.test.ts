@@ -4,7 +4,12 @@
  * Тесты лежат в веб-пакете, потому что vitest настроен здесь, а сама
  * функция общая: ей пользуются и форма, и валидация на бэкенде.
  */
-import { buildTelUrl, formatPhone, normalizePhone } from '@vk-rideshare/shared';
+import {
+  buildTelUrl,
+  buildTelegramDialogUrl,
+  formatPhone,
+  normalizePhone,
+} from '@vk-rideshare/shared';
 import { describe, expect, it } from 'vitest';
 
 describe('normalizePhone', () => {
@@ -62,5 +67,29 @@ describe('formatPhone', () => {
 describe('buildTelUrl', () => {
   it('собирает ссылку для набора', () => {
     expect(buildTelUrl('+79991234567')).toBe('tel:+79991234567');
+  });
+});
+
+describe('ссылка на диалог Telegram', () => {
+  it('собирается по @username, с собакой и без', () => {
+    expect(buildTelegramDialogUrl('rustam_driver')).toBe('https://t.me/rustam_driver');
+    expect(buildTelegramDialogUrl('@rustam_driver')).toBe('https://t.me/rustam_driver');
+  });
+
+  it('нет имени — нет и ссылки, а значит и кнопки', () => {
+    expect(buildTelegramDialogUrl(null)).toBeNull();
+    expect(buildTelegramDialogUrl('')).toBeNull();
+  });
+
+  /*
+   * Имя приходит из initData, то есть снаружи. Подставлять его в адрес
+   * без проверки — значит дать чужой строке решать, куда уйдёт человек.
+   */
+  it('посторонние символы в имени ссылку не дают', () => {
+    expect(buildTelegramDialogUrl('пользователь')).toBeNull();
+    expect(buildTelegramDialogUrl('evil/../path')).toBeNull();
+    expect(buildTelegramDialogUrl('bad name')).toBeNull();
+    expect(buildTelegramDialogUrl('a')).toBeNull();
+    expect(buildTelegramDialogUrl('x'.repeat(33))).toBeNull();
   });
 });

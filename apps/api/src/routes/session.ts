@@ -132,6 +132,7 @@ export const sessionRoutes = ({ prisma, env, writeRateLimit }: RouteDeps): Fasti
           firstName?: string;
           lastName?: string;
           photoUrl?: string | null;
+          tgUsername?: string | null;
           city?: string | null;
           phone?: string | null;
           privacyAcceptedAt?: Date;
@@ -140,6 +141,13 @@ export const sessionRoutes = ({ prisma, env, writeRateLimit }: RouteDeps): Fasti
           update.firstName = signed.firstName;
           update.lastName = signed.lastName;
           update.photoUrl = signed.photoUrl;
+          /*
+           * Имя записывается и когда его нет: человек мог сменить или
+           * убрать @username, а в Telegram освободившееся имя почти сразу
+           * занимает кто-то другой. Оставить старое — значит однажды
+           * отправить попутчика в чужой диалог.
+           */
+          update.tgUsername = signed.username;
         } else {
           if (body.firstName !== undefined) {
             update.firstName = body.firstName;
@@ -176,6 +184,7 @@ export const sessionRoutes = ({ prisma, env, writeRateLimit }: RouteDeps): Fasti
             firstName: signed?.firstName ?? body.firstName ?? 'Пользователь',
             lastName: signed?.lastName ?? body.lastName ?? '',
             photoUrl: signed?.photoUrl ?? body.photoUrl ?? null,
+            tgUsername: signed?.username ?? null,
             city: body.city ?? null,
             phone: body.phone ?? null,
             privacyAcceptedAt: acceptedAt,

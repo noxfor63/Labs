@@ -136,6 +136,27 @@ export const PRIVACY_POLICY_URL = 'https://vk-rideshare.duckdns.org/privacy';
  */
 export const SUPPORT_EMAIL = 'noxfor63@gmail.com';
 
+/**
+ * Ссылка на диалог в Telegram по @username.
+ *
+ * По числовому идентификатору диалог не открывается: ссылки вида
+ * `tg://user?id=…` работают не во всех клиентах и не из мини-приложения.
+ * Поэтому единственный надёжный способ — @username, а у кого его нет,
+ * у того и кнопки не будет.
+ *
+ * Проверка формата здесь не для красоты: имя приходит из initData, то
+ * есть снаружи, и подставлять его в адрес без проверки — это дать чужой
+ * строке решать, куда уйдёт человек. Правила Telegram: 5–32 символа,
+ * латиница, цифры и подчёркивание.
+ */
+export function buildTelegramDialogUrl(username: string | null): string | null {
+  if (username === null) {
+    return null;
+  }
+  const clean = username.trim().replace(/^@/, '');
+  return /^[A-Za-z0-9_]{5,32}$/.test(clean) ? `https://t.me/${clean}` : null;
+}
+
 /** Launch-параметры старше суток считаются протухшими. */
 export const LAUNCH_PARAMS_MAX_AGE_SECONDS = 24 * 60 * 60;
 

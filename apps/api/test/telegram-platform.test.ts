@@ -72,6 +72,57 @@ describe('площадка Telegram', () => {
     expect(response.json().user.lastName).toBe('Тележный');
   });
 
+  it('@username сохраняется: по нему открывается диалог', async () => {
+    const response = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/session',
+      headers: telegramHeaders({
+        id: TG_ID,
+        first_name: 'Рустам',
+        last_name: 'Тележный',
+        username: 'rustam_driver',
+      }),
+      payload: { privacyAccepted: true },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().user.tgUsername).toBe('rustam_driver');
+  });
+
+  it('снятый @username стирается, а не остаётся от прошлого запуска', async () => {
+    // Освободившееся имя в Telegram почти сразу занимает кто-то другой:
+    // сохранить старое — значит однажды отправить попутчика в чужой диалог.
+    await ctx.app.inject({
+      method: 'POST',
+      url: '/api/session',
+      headers: telegramHeaders({ id: TG_ID, first_name: 'Рустам', username: 'rustam_driver' }),
+      payload: { privacyAccepted: true },
+    });
+
+    const response = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/session',
+      headers: telegramHeaders({ id: TG_ID, first_name: 'Рустам' }),
+      payload: { privacyAccepted: true },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().user.tgUsername).toBeNull();
+  });
+
+  it('пришедшему из ВКонтакте имя Telegram не приписывается', async () => {
+    const response = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/session',
+      headers: authHeaders(VK_ID),
+      // Тело можно прислать любое — колонка заполняется только из подписи.
+      payload: { privacyAccepted: true, tgUsername: 'samozvanec' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().user.tgUsername).toBeNull();
+  });
+
   it('пользователь Telegram создаёт поездку, и её видно из ВКонтакте', async () => {
     const created = await ctx.app.inject({
       method: 'POST',

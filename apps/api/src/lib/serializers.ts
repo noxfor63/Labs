@@ -25,6 +25,7 @@ export function toUserPublic(user: User): UserPublic {
     // кнопки связи показывать.
     vkUserId: user.vkUserId === null ? null : user.vkUserId.toString(),
     tgUserId: user.tgUserId === null ? null : user.tgUserId.toString(),
+    tgUsername: user.tgUsername,
     firstName: user.firstName,
     lastName: user.lastName,
     photoUrl: user.photoUrl,

@@ -9,8 +9,9 @@
  *   • VKWebAppGetPersonalCard → PersonalCardData { phone?, email?, address? }
  *   • событие VKWebAppUpdateConfig → ParentConfigData { appearance, scheme }
  *
- * Метода «открыть диалог с пользователем» в пакете нет, поэтому кнопка
- * «Написать» ведёт на страницу профиля — см. buildProfileUrl ниже.
+ * Метода «открыть диалог с пользователем» в пакете нет, поэтому во
+ * ВКонтакте кнопка ведёт на страницу профиля — см. buildProfileUrl ниже.
+ * Диалог открывается только в Telegram и только по @username.
  */
 import bridge, { type ParentConfigData, type UserInfo } from '@vkontakte/vk-bridge';
 import type { ColorSchemeType } from '@vkontakte/vkui';
@@ -163,8 +164,8 @@ export function subscribeColorScheme(
  * Ссылка на профиль ВКонтакте.
  *
  * Подтверждённого способа открыть диалог из мини-приложения в API нет,
- * поэтому кнопка «Написать» ведёт на профиль — оттуда диалог открывается
- * штатными средствами клиента.
+ * поэтому кнопка ведёт на профиль — оттуда диалог открывается штатными
+ * средствами клиента.
  */
 export function buildProfileUrl(vkUserId: string): string {
   return `https://vk.com/id${vkUserId}`;

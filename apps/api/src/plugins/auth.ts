@@ -93,6 +93,7 @@ function authenticateTelegram(raw: string, env: AppEnv): Principal {
         firstName: verified.user.firstName,
         lastName: verified.user.lastName,
         photoUrl: verified.user.photoUrl,
+        username: verified.user.username,
       },
     };
   } catch (error) {
