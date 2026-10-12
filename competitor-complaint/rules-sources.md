@@ -14,6 +14,8 @@
 | `https://vk.com/dev/rules` | 403, соединение отклонено |
 | `https://vk.ru/dev/rules` | 403, соединение отклонено |
 | `https://web.archive.org/…` | 403, соединение отклонено |
+| `https://dev.vk.ru/ru/privacy-policy?ref=old_portal` | имя не разрешается (проверено 12.10.2026) |
+| `https://dev.vk.com/ru/privacy-policy` | 403, соединение отклонено (12.10.2026) |
 
 Поиск по сети находит только архивные редакции правил (06.12.2022 и
 06.04.2023 на `dev.vk.ru/en/mini-apps-rules/…`) и копию страницы
