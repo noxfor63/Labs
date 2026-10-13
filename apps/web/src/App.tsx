@@ -31,6 +31,7 @@ import { useState, type ReactNode } from 'react';
 
 import { getPlatform } from './platform/index.js';
 import { ErrorState } from './components/ErrorState.js';
+import { OfflineScreen } from './components/OfflineScreen.js';
 import { PrivacyGate } from './components/PrivacyGate.js';
 import { useReport } from './lib/ReportContext.js';
 import { useSession } from './lib/SessionContext.js';
@@ -173,6 +174,16 @@ export function App(): ReactNode {
         </SplitCol>
       </SplitLayout>
     );
+  }
+
+  /*
+   * Нет связи — отдельный экран, а не общая ошибка: он показывает
+   * сохранённую ленту с номерами телефонов. Мобильный интернет могут
+   * ограничить, а звонки при этом работают, и человеку хватит номера,
+   * чтобы доехать без приложения. Подробности — в lib/feedCache.ts.
+   */
+  if (session.error !== null && session.error.isNetwork) {
+    return <OfflineScreen onRetry={session.reload} />;
   }
 
   if (session.error !== null) {

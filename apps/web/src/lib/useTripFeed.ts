@@ -2,6 +2,7 @@ import type { TripListQuery, TripSummary } from '@vk-rideshare/shared';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { ApiRequestError, api } from '../api/client.js';
+import { saveFeed } from './feedCache.js';
 
 export type TripFeed = {
   items: TripSummary[];
@@ -54,6 +55,15 @@ export function useTripFeed(filters: TripListQuery): TripFeed {
       .then((page) => {
         if (cancelled) {
           return;
+        }
+        /*
+         * Снимок на устройство — только для ленты без фильтров.
+         * Предсказуемость важнее полноты: иначе в отключение связи
+         * человек увидел бы остаток последнего фильтра и не понял, куда
+         * делись остальные поездки. Подробности — в feedCache.ts.
+         */
+        if (Object.keys(stableFilters).length === 0) {
+          saveFeed(page.items);
         }
         setState({
           key,

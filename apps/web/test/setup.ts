@@ -25,6 +25,17 @@ if (typeof window !== 'undefined') {
     })) as typeof window.matchMedia;
   }
 
+  // VKUI меряет размеры шапки и фиксированных блоков — без заглушки
+  // любой экран с PanelHeader падает в jsdom.
+  if (!('ResizeObserver' in window)) {
+    class FakeResizeObserver {
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    }
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+  }
+
   if (!('IntersectionObserver' in window)) {
     class FakeIntersectionObserver {
       observe(): void {}
