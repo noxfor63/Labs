@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { AKBULAK, ORENBURG, SOL_ILETSK } from '@vk-rideshare/shared';
+import { AKBULAK, ORENBURG, ROUTES, SOL_ILETSK } from '@vk-rideshare/shared';
 
 import { authHeaders, createTestApp, type TestContext } from './helpers.js';
 
@@ -99,21 +99,18 @@ describe('GET /api/trips — фильтры на сид-данных', () => {
     expect(back.items.some((trip) => thereIds.has(trip.id))).toBe(false);
   });
 
-  it('в ленте только шесть направлений справочника', async () => {
+  it('в ленте только направления справочника, и все через хаб', async () => {
     const { items } = await fetchTrips('?limit=50');
     const routes = new Set(items.map((trip) => `${trip.fromCity}→${trip.toCity}`));
 
     expect(routes.size).toBeGreaterThan(0);
-    expect(routes.size).toBeLessThanOrEqual(6);
+    expect(routes.size).toBeLessThanOrEqual(ROUTES.length);
+    // Список берётся из справочника, а не переписывается здесь: вторая
+    // копия разошлась бы с первой на первом же добавлении пункта.
+    const allowed = new Set(ROUTES.map((route) => `${route.from}→${route.to}`));
     for (const route of routes) {
-      expect([
-        `${ORENBURG}→${SOL_ILETSK}`,
-        `${SOL_ILETSK}→${ORENBURG}`,
-        `${ORENBURG}→${AKBULAK}`,
-        `${AKBULAK}→${ORENBURG}`,
-        `${AKBULAK}→${SOL_ILETSK}`,
-        `${SOL_ILETSK}→${AKBULAK}`,
-      ]).toContain(route);
+      expect(allowed.has(route), route).toBe(true);
+      expect(route.includes(ORENBURG), route).toBe(true);
     }
   });
 

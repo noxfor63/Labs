@@ -243,7 +243,23 @@ export const tripListQuerySchema = z.object({
     .min(1)
     .max(LIMITS.PAGE_SIZE_MAX)
     .default(LIMITS.PAGE_SIZE_DEFAULT),
-});
+})
+  /*
+   * Пара проверяется здесь же, а не только при создании поездки.
+   * Фильтр «Акбулак → Соль-Илецк» раньше проходил валидацию и молча
+   * возвращал пустую ленту: человек видел «поездок нет» вместо «такого
+   * направления не бывает». Разница существенная — в первом случае он
+   * будет ждать, что они появятся.
+   */
+  .refine(
+    (value) =>
+      value.from === undefined || value.to === undefined || isKnownRoute(value.from, value.to),
+    {
+      message: 'Такого направления нет: поездки идут только в Оренбург или из Оренбурга',
+      path: ['to'],
+    },
+  );
+
 export type TripListQuery = z.input<typeof tripListQuerySchema>;
 
 /* ───────────────────────── вход: создание поездки ───────────────────────── */
@@ -274,7 +290,7 @@ export const createTripSchema = z
     path: ['departAt'],
   })
   .refine((value) => isKnownRoute(value.fromCity, value.toCity), {
-    message: 'Такого направления нет. Доступны Оренбург, Соль-Илецк и Акбулак между собой',
+    message: 'Такого направления нет: поездки идут только в Оренбург или из Оренбурга',
     path: ['toCity'],
   });
 export type CreateTripInput = z.input<typeof createTripSchema>;

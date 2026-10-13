@@ -1,9 +1,9 @@
 import {
-  CITIES,
+  DIRECTION,
   LIMITS,
   SEAT_OPTIONS,
-  destinationsFrom,
-  isKnownRoute,
+  buildRoute,
+  type Direction,
   type TripListQuery,
   type TripRole,
 } from '@vk-rideshare/shared';
@@ -31,26 +31,27 @@ import { FilterChips, type ChipOption } from '../components/FilterChips.js';
 import { TripCard } from '../components/TripCard.js';
 import { TripCardSkeleton } from '../components/TripCardSkeleton.js';
 import { toDateInputValue } from '../lib/format.js';
+import { SPOKE_CHIPS, directionChips } from '../lib/routeChips.js';
 import { useNow } from '../lib/useNow.js';
 import { useTripFeed } from '../lib/useTripFeed.js';
 
 const ANY = 'ANY';
 
 /**
- * Направление — два коротких ряда «откуда» и «куда», а не шесть длинных
- * «таблеток» с полными названиями маршрутов.
+ * Маршрут выбирается в два шага: спица, затем сторона.
  *
- * Шесть подписей вида «Оренбург → Соль-Илецк» не помещались на экран
- * телефона и уезжали в горизонтальную прокрутку. Названий городов всего
- * три, поэтому в разбивке по «откуда» и «куда» тот же выбор занимает две
- * строки и виден целиком.
+ * Восемь подписей вида «Оренбург → Соль-Илецк» одним рядом не помещаются
+ * на экран телефона и уезжают в горизонтальную прокрутку, а варианты за
+ * краем экрана обычно просто не находят. В радиальной модели выбор и так
+ * распадается на два: какая спица и в какую сторону — спиц четыре,
+ * сторон две, оба ряда видны целиком.
  *
- * Второй ряд показывается только после выбора города и содержит лишь
- * достижимые из него направления — невозможный маршрут нельзя и собрать.
+ * Ряд со стороной показывается только после выбора спицы: без неё
+ * сторона ничего не значит.
  */
-const CITY_CHIPS: readonly ChipOption<string>[] = [
+const SPOKE_FILTER_CHIPS: readonly ChipOption<string>[] = [
   { value: ANY, label: 'Все' },
-  ...CITIES.map((city) => ({ value: city.name, label: city.name })),
+  ...SPOKE_CHIPS,
 ];
 
 type DayFilter = 'ANY' | 'TODAY' | 'TOMORROW' | 'CUSTOM';
@@ -103,8 +104,17 @@ export function SearchPanel({ id }: { id: string }): ReactNode {
   // Через useNow, а не Date.now() в рендере: «сегодня» обязано пережить полночь.
   const now = useNow();
 
-  const [from, setFrom] = useState(ANY);
-  const [to, setTo] = useState(ANY);
+  const [spoke, setSpoke] = useState(ANY);
+  /*
+   * Сторона выбрана заранее, а не пустая: «спица плюс сторона» — это один
+   * маршрут, и состояния «спица есть, сторона нет» в фильтре быть не
+   * может — лента показывает одно направление, а не оба сразу. По
+   * умолчанию стоит дорога в Оренбург: в областной центр из райцентра
+   * едут чаще, чем обратно (больница, документы, рынок). Обе стороны
+   * подписаны полным маршрутом и лежат рядом, так что переключение —
+   * одно касание.
+   */
+  const [direction, setDirection] = useState<Direction>(DIRECTION.TO_HUB);
   const [day, setDay] = useState<DayFilter>('ANY');
   const [customDate, setCustomDate] = useState('');
   const [role, setRole] = useState<RoleFilter>('ANY');
@@ -126,11 +136,10 @@ export function SearchPanel({ id }: { id: string }): ReactNode {
   const query = useMemo<TripListQuery>(() => {
     const next: TripListQuery = {};
 
-    if (from !== ANY) {
-      next.from = from;
-    }
-    if (to !== ANY) {
-      next.to = to;
+    if (spoke !== ANY) {
+      const route = buildRoute(spoke, direction);
+      next.from = route.from;
+      next.to = route.to;
     }
 
     if (day === 'TODAY') {
@@ -151,31 +160,14 @@ export function SearchPanel({ id }: { id: string }): ReactNode {
       next.seatsMin = Number(seatsMin);
     }
     return next;
-  }, [from, to, day, customDate, dates, role, priceMax, seatsMin]);
+  }, [spoke, direction, day, customDate, dates, role, priceMax, seatsMin]);
 
   const feed = useTripFeed(query);
   const hasFilters = Object.keys(query).length > 0;
 
-  /** Во втором ряду — только города, куда из выбранного действительно ездят. */
-  const toChips: ChipOption<string>[] =
-    from === ANY
-      ? [...CITY_CHIPS]
-      : [
-          { value: ANY, label: 'Все' },
-          ...destinationsFrom(from).map((city) => ({ value: city.name, label: city.name })),
-        ];
-
-  const pickFrom = (value: string): void => {
-    setFrom(value);
-    // Прошлое «куда» могло стать недостижимым — тогда сбрасываем его.
-    if (value !== ANY && to !== ANY && !isKnownRoute(value, to)) {
-      setTo(ANY);
-    }
-  };
-
   const reset = (): void => {
-    setFrom(ANY);
-    setTo(ANY);
+    setSpoke(ANY);
+    setDirection(DIRECTION.TO_HUB);
     setDay('ANY');
     setCustomDate('');
     setRole('ANY');
@@ -282,23 +274,23 @@ export function SearchPanel({ id }: { id: string }): ReactNode {
           style={{ display: 'flex', flexDirection: 'column', gap: 'var(--app-space-4)' }}
         >
           <div>
-            <FilterLabel>Откуда</FilterLabel>
+            <FilterLabel>Направление</FilterLabel>
             <FilterChips
-              ariaLabel="Город отправления"
-              options={CITY_CHIPS}
-              value={from}
-              onChange={pickFrom}
+              ariaLabel="Направление поездки"
+              options={SPOKE_FILTER_CHIPS}
+              value={spoke}
+              onChange={setSpoke}
             />
           </div>
 
-          {from !== ANY && (
+          {spoke !== ANY && (
             <div>
-              <FilterLabel>Куда</FilterLabel>
+              <FilterLabel>Сторона</FilterLabel>
               <FilterChips
-                ariaLabel="Город назначения"
-                options={toChips}
-                value={to}
-                onChange={setTo}
+                ariaLabel="Сторона маршрута"
+                options={directionChips(spoke)}
+                value={direction}
+                onChange={setDirection}
               />
             </div>
           )}

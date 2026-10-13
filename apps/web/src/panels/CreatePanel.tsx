@@ -1,15 +1,15 @@
 import {
-  CITIES,
   DEPART_TIME_SLOTS,
   LIMITS,
   SEAT_OPTIONS,
-  destinationsFrom,
+  buildRoute,
   formatPhone,
   isAllowedDepartTime,
-  isKnownRoute,
   isUnreachable,
   normalizePhone,
   type CreateTripInput,
+  type Direction,
+  type Route,
   type TripRole,
 } from '@vk-rideshare/shared';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
@@ -33,13 +33,9 @@ import { ApiRequestError, api } from '../api/client.js';
 import { FilterChips, type ChipOption } from '../components/FilterChips.js';
 import { PhoneField } from '../components/PhoneField.js';
 import { toDateInputValue } from '../lib/format.js';
+import { SPOKE_CHIPS, directionChips } from '../lib/routeChips.js';
 import { useSession } from '../lib/SessionContext.js';
 import { useSnackbar } from '../lib/SnackbarContext.js';
-
-const cityChips: readonly ChipOption<string>[] = CITIES.map((city) => ({
-  value: city.name,
-  label: city.name,
-}));
 
 /** 48 получасовых слотов суток — время выезда выбирается только из них. */
 const timeOptions = DEPART_TIME_SLOTS.map((slot) => ({ value: slot, label: slot }));
@@ -60,9 +56,11 @@ type FieldErrors = Partial<Record<string, string>>;
 
 type FormState = {
   role: TripRole;
-  fromCity: string;
+  /** Спица маршрута; null — не выбрана. Оренбург всегда второй конец. */
+  spoke: string | null;
+  /** Сторона: из Оренбурга или в Оренбург. null — не выбрана. */
+  direction: Direction | null;
   fromPoint: string;
-  toCity: string;
   toPoint: string;
   date: string;
   time: string;
@@ -79,9 +77,9 @@ type FormState = {
  */
 const emptyForm = (phone: string): FormState => ({
   role: 'DRIVER',
-  fromCity: '',
+  spoke: null,
+  direction: null,
   fromPoint: '',
-  toCity: '',
   toPoint: '',
   date: toDateInputValue(new Date(Date.now() + 24 * 60 * 60 * 1000)),
   time: '09:00',
@@ -93,17 +91,24 @@ const emptyForm = (phone: string): FormState => ({
 });
 
 /** Локальная проверка — чтобы не гонять заведомо плохую форму на сервер. */
-function validate(form: FormState, phoneRequired: boolean): { errors: FieldErrors; departAt: Date | null } {
+function validate(
+  form: FormState,
+  phoneRequired: boolean,
+): { errors: FieldErrors; departAt: Date | null; route: Route | null } {
   const errors: FieldErrors = {};
 
-  if (form.fromCity === '') {
-    errors['fromCity'] = 'Выберите город отправления';
-  }
-  if (form.toCity === '') {
-    errors['toCity'] = 'Выберите город назначения';
-  }
-  if (form.fromCity !== '' && form.toCity !== '' && !isKnownRoute(form.fromCity, form.toCity)) {
-    errors['toCity'] = 'Такого направления нет';
+  /*
+   * Маршрут собирается из спицы и стороны, а не вводится двумя городами.
+   * Проверять пару на существование больше не нужно: пара, которой нет,
+   * в двухшаговом выборе просто не выражается.
+   */
+  let route: Route | null = null;
+  if (form.spoke === null) {
+    errors['spoke'] = 'Выберите направление';
+  } else if (form.direction === null) {
+    errors['direction'] = 'Выберите, в какую сторону едете';
+  } else {
+    route = buildRoute(form.spoke, form.direction);
   }
 
   let departAt: Date | null = null;
@@ -158,7 +163,7 @@ function validate(form: FormState, phoneRequired: boolean): { errors: FieldError
     errors['priceRub'] = `От ${LIMITS.PRICE_MIN} до ${LIMITS.PRICE_MAX} ₽`;
   }
 
-  return { errors, departAt };
+  return { errors, departAt, route };
 }
 
 export function CreatePanel({ id }: { id: string }): ReactNode {
@@ -194,17 +199,17 @@ export function CreatePanel({ id }: { id: string }): ReactNode {
     isUnreachable({ vkUserId: session.user.vkUserId, phone: form.phone });
 
   const submit = async (): Promise<void> => {
-    const { errors: found, departAt } = validate(form, phoneRequired);
+    const { errors: found, departAt, route } = validate(form, phoneRequired);
     setErrors(found);
-    if (Object.keys(found).length > 0 || departAt === null) {
+    if (Object.keys(found).length > 0 || departAt === null || route === null) {
       return;
     }
 
     const input: CreateTripInput = {
       role: form.role,
-      fromCity: form.fromCity,
+      fromCity: route.from,
       fromPoint: form.fromPoint.trim() === '' ? null : form.fromPoint.trim(),
-      toCity: form.toCity,
+      toCity: route.to,
       toPoint: form.toPoint.trim() === '' ? null : form.toPoint.trim(),
       departAt: departAt.toISOString(),
       seatsTotal: Number(form.seatsTotal),
@@ -237,20 +242,6 @@ export function CreatePanel({ id }: { id: string }): ReactNode {
 
   const isDriver = form.role === 'DRIVER';
 
-  // Направления закрытые: показываем только достижимые города,
-  // чтобы невозможный маршрут нельзя было и собрать.
-  const toCityChips: readonly ChipOption<string>[] =
-    form.fromCity === ''
-      ? cityChips
-      : destinationsFrom(form.fromCity).map((city) => ({ value: city.name, label: city.name }));
-
-  const pickFromCity = (value: string): void => {
-    update('fromCity', value);
-    if (value !== '' && form.toCity !== '' && !isKnownRoute(value, form.toCity)) {
-      update('toCity', '');
-    }
-  };
-
   return (
     <Panel id={id}>
       <PanelHeader>Новая поездка</PanelHeader>
@@ -272,38 +263,49 @@ export function CreatePanel({ id }: { id: string }): ReactNode {
 
       <Group header={<Header size="s">Маршрут</Header>}>
         {/*
-          Те же «таблетки», что в поиске. Городов три, набор закрытый —
-          выпадающий список здесь был лишним шагом: открыть, выбрать,
-          закрыть вместо одного касания. Заодно оба города видны рядом, и
-          маршрут читается целиком, а не двумя полями через форму.
+          Те же два шага, что в поиске: спица, затем сторона. Выбора
+          «любой город → любой город» здесь нет и быть не может — все
+          поездки идут через Оренбург, и два независимых списка городов
+          давали бы заведомо невозможные пары вроде «Акбулак →
+          Соль-Илецк».
         */}
         <FormItem
-          top="Откуда"
-          status={errors['fromCity'] === undefined ? 'default' : 'error'}
-          bottom={errors['fromCity']}
+          top="Направление"
+          status={errors['spoke'] === undefined ? 'default' : 'error'}
+          bottom={errors['spoke']}
         >
           <FilterChips
-            ariaLabel="Город отправления"
-            options={cityChips}
-            value={form.fromCity}
-            onChange={pickFromCity}
-          />
-        </FormItem>
-
-        <FormItem
-          top="Куда"
-          status={errors['toCity'] === undefined ? 'default' : 'error'}
-          bottom={errors['toCity']}
-        >
-          <FilterChips
-            ariaLabel="Город назначения"
-            options={toCityChips}
-            value={form.toCity}
+            ariaLabel="Направление поездки"
+            options={SPOKE_CHIPS}
+            value={form.spoke}
             onChange={(value) => {
-              update('toCity', value);
+              update('spoke', value);
             }}
           />
         </FormItem>
+
+        {/*
+          Сторона не подставляется сама, в отличие от фильтра поиска:
+          неверно угаданный фильтр человек поправит, увидев не ту ленту, а
+          неверно угаданная сторона уедет в опубликованное объявление —
+          попутчики приедут не туда.
+        */}
+        {form.spoke !== null && (
+          <FormItem
+            top="В какую сторону"
+            status={errors['direction'] === undefined ? 'default' : 'error'}
+            bottom={errors['direction']}
+          >
+            <FilterChips
+              ariaLabel="Сторона маршрута"
+              options={directionChips(form.spoke)}
+              value={form.direction}
+              onChange={(value) => {
+                update('direction', value);
+              }}
+            />
+          </FormItem>
+        )}
 
         {/* Точки сбора и высадки — после обоих городов: сначала «куда едем»,
             потом подробности. Раньше они стояли между городами и разрывали

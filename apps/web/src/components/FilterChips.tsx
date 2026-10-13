@@ -22,7 +22,8 @@ export function FilterChips<T extends string>({
   ariaLabel,
 }: {
   options: readonly ChipOption<T>[];
-  value: T;
+  /** null — не выбрано ничего; так начинается форма, где выбор обязателен. */
+  value: T | null;
   onChange: (value: T) => void;
   ariaLabel: string;
 }): ReactNode {

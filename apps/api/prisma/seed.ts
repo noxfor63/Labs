@@ -9,6 +9,8 @@ import { type Prisma, type PrismaClient } from '@prisma/client';
 
 import {
   AKBULAK,
+  ALEKSANDROVKA,
+  ILEK,
   CITIES,
   LIMITS,
   ORENBURG,
@@ -66,14 +68,19 @@ const PEOPLE = [
 ] as const;
 
 /**
- * Цена зависит от направления: Оренбург — Соль-Илецк около 70 км,
- * Акбулак — Соль-Илецк около 90, Оренбург — Акбулак около 130.
- * Коридор целиком укладывается в LIMITS.PRICE_MIN..PRICE_MAX.
+ * Цена зависит от спицы: чем дальше райцентр от Оренбурга, тем выше
+ * коридор. Точные километры здесь не важны — это данные для локальной
+ * разработки; важно, что коридоры разные и целиком укладываются в
+ * LIMITS.PRICE_MIN..PRICE_MAX.
+ *
+ * Коридор задаётся на спицу, а не на направление: обратная дорога стоит
+ * столько же, сколько туда.
  */
 const PRICE_BY_ROUTE: ReadonlyArray<{ cities: readonly [string, string]; min: number; max: number }> = [
   { cities: [ORENBURG, SOL_ILETSK], min: 500, max: 600 },
-  { cities: [AKBULAK, SOL_ILETSK], min: 550, max: 700 },
   { cities: [ORENBURG, AKBULAK], min: 700, max: 850 },
+  { cities: [ORENBURG, ILEK], min: 600, max: 750 },
+  { cities: [ORENBURG, ALEKSANDROVKA], min: 500, max: 650 },
 ];
 
 /** Цена кратна 50 рублям — так её и называют в объявлениях. */
