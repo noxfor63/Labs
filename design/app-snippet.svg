@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 630" width="1120" height="630" role="img" aria-label="По пути — поиск попутчиков: Оренбург, Соль-Илецк, Акбулак">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 630" width="1120" height="630" role="img" aria-label="По пути — поиск попутчиков: Оренбург, Соль-Илецк, Акбулак, Илек, Александровка">
   <title>По пути</title>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
@@ -26,8 +26,12 @@
   <g font-family="Liberation Sans, DejaVu Sans, sans-serif" fill="#FFFFFF">
     <!-- Название короткое, поэтому идёт одной строкой и крупнее прежнего:
          «По пути» само по себе не объясняет, что это, — пояснение ниже. -->
-    <text x="470" y="300" font-size="98" font-weight="bold" letter-spacing="-2">По пути</text>
-    <text x="474" y="362" font-size="38" fill-opacity="0.95">Поиск попутчиков</text>
-    <text x="474" y="414" font-size="31" fill-opacity="0.78">Оренбург · Соль-Илецк · Акбулак</text>
+    <text x="470" y="286" font-size="98" font-weight="bold" letter-spacing="-2">По пути</text>
+    <text x="474" y="348" font-size="38" fill-opacity="0.95">Поиск попутчиков</text>
+    <!-- Пять пунктов в одну строку не помещаются, поэтому список перенесён.
+         Оренбург стоит первым и отдельно от спиц не случайно: все поездки
+         идут через него. -->
+    <text x="474" y="400" font-size="31" fill-opacity="0.78">Оренбург · Соль-Илецк · Акбулак</text>
+    <text x="474" y="442" font-size="31" fill-opacity="0.78">Илек · Александровка</text>
   </g>
 </svg>

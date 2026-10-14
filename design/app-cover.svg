@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1590 400" width="1590" height="400" role="img" aria-label="По пути — поиск попутчиков — Оренбург, Соль-Илецк, Акбулак">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1590 400" width="1590" height="400" role="img" aria-label="По пути — поиск попутчиков — Оренбург, Соль-Илецк, Акбулак, Илек, Александровка">
   <title>По пути</title>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
@@ -13,9 +13,12 @@
   <!-- Текст держится в левой половине: площадка может обрезать обложку
        по краям, и название не должно попасть под обрез. -->
   <g font-family="Liberation Sans, DejaVu Sans, sans-serif" fill="#FFFFFF">
-    <text x="96" y="186" font-size="104" font-weight="bold" letter-spacing="-2">По пути</text>
-    <text x="100" y="238" font-size="40" fill-opacity="0.95">Поиск попутчиков</text>
-    <text x="100" y="292" font-size="34" fill-opacity="0.78">Оренбург · Соль-Илецк · Акбулак</text>
+    <text x="96" y="172" font-size="104" font-weight="bold" letter-spacing="-2">По пути</text>
+    <text x="100" y="224" font-size="40" fill-opacity="0.95">Поиск попутчиков</text>
+    <!-- Список перенесён на две строки: пять пунктов в одну не помещаются,
+         а обрезать их нельзя — человек ищет глазами своё название. -->
+    <text x="100" y="278" font-size="34" fill-opacity="0.78">Оренбург · Соль-Илецк · Акбулак</text>
+    <text x="100" y="322" font-size="34" fill-opacity="0.78">Илек · Александровка</text>
   </g>
 
   <!-- Тот же знак, что на аватарке, в уменьшенном виде: обложка и иконка
