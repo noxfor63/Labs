@@ -4,12 +4,67 @@ import {
   formatPhone,
   type UserPublic,
 } from '@vk-rideshare/shared';
-import { Icon20LogoVk, Icon20PhoneOutline, Icon20Send } from '@vkontakte/icons';
+import {
+  Icon20CopyOutline,
+  Icon20LogoVk,
+  Icon20PhoneOutline,
+  Icon20Send,
+} from '@vkontakte/icons';
 import { Button, Caption, Div } from '@vkontakte/vkui';
 import type { ReactNode } from 'react';
 
+import { useSnackbar } from '../lib/SnackbarContext.js';
+import { copyText, getCallMode } from '../platform/phone-call.js';
 import { openTelegramDialog } from '../platform/telegram-sdk.js';
 import { buildProfileUrl } from '../vk/bridge.js';
+
+/**
+ * Главная кнопка связи по номеру.
+ *
+ * Как именно она звонит, решает platform/phone-call.ts: обычная ссылка
+ * tel: работает только там, где приложение — верхний документ. Во фрейме
+ * браузерной версии ВКонтакте такой переход запрещён политикой страницы, и
+ * приложение целиком подменялось страницей ошибки — за это модерация и
+ * отклонила версию. На компьютере кнопка копирует номер: позвонить с него
+ * всё равно нечем.
+ */
+function CallButton({ phone }: { phone: string }): ReactNode {
+  const snackbar = useSnackbar();
+  const mode = getCallMode();
+
+  if (mode === 'copy') {
+    return (
+      <Button
+        size="l"
+        stretched
+        before={<Icon20CopyOutline />}
+        onClick={() => {
+          void copyText(phone).then((copied) => {
+            if (copied) {
+              snackbar.showSuccess(`Номер ${formatPhone(phone)} скопирован`);
+            } else {
+              snackbar.showError('Не удалось скопировать — номер написан под кнопкой');
+            }
+          });
+        }}
+      >
+        Скопировать номер
+      </Button>
+    );
+  }
+
+  return (
+    <Button
+      size="l"
+      stretched
+      before={<Icon20PhoneOutline />}
+      href={buildTelUrl(phone)}
+      {...(mode === 'dial-new-window' ? { target: '_blank', rel: 'noreferrer' } : {})}
+    >
+      Позвонить
+    </Button>
+  );
+}
 
 /**
  * Способы связаться с человеком: звонок, страница ВКонтакте, диалог в
@@ -20,7 +75,8 @@ import { buildProfileUrl } from '../vk/bridge.js';
  * запасной путь для тех, кто номер не указал.
  *
  * Кнопки, которой не на что вести, нет вовсе: нет номера — нет
- * «Позвонить», нет страницы ВКонтакте — нет «Профиля», нет @username в
+ * «Позвонить» (на компьютере — «Скопировать номер»), нет страницы
+ * ВКонтакте — нет «Профиля», нет @username в
  * Telegram — нет «Написать». Неактивная кнопка, по которой нельзя
  * понять почему, раздражает сильнее, чем её отсутствие.
  */
@@ -39,16 +95,7 @@ export function ContactButtons({ user }: { user: UserPublic }): ReactNode {
 
   return (
     <Div>
-      {phone !== null && (
-        <Button
-          size="l"
-          stretched
-          before={<Icon20PhoneOutline />}
-          href={buildTelUrl(phone)}
-        >
-          Позвонить
-        </Button>
-      )}
+      {phone !== null && <CallButton phone={phone} />}
 
       {(vkUserId !== null || telegramUrl !== null) && (
         <div style={{ display: 'flex', gap: 8, marginTop: phone === null ? 0 : 8 }}>

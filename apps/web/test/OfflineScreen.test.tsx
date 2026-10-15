@@ -13,6 +13,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OfflineScreen } from '../src/components/OfflineScreen.js';
 import { saveFeed } from '../src/lib/feedCache.js';
 
+/*
+ * Экран без связи нужен телефону: интернет ограничен, а звонки работают.
+ * В jsdom устройство определилось бы как компьютер, и вместо «Позвонить»
+ * была бы кнопка копирования — поэтому режим закреплён явно. Сами режимы
+ * проверяются в ContactButtons.test.tsx.
+ */
+vi.mock('../src/platform/phone-call.js', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  getCallMode: () => 'dial',
+}));
+
 const trip = (overrides: Partial<TripSummary> = {}): TripSummary => ({
   id: 'trip-1',
   role: 'DRIVER',

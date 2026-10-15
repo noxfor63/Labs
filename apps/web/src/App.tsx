@@ -158,11 +158,19 @@ export function App(): ReactNode {
               <Group>
                 <Placeholder title="Доступ закрыт">{session.error.message}</Placeholder>
                 <Div>
+                  {/*
+                    В новом окне, а не в этом: во фрейме браузерной версии
+                    ВКонтакте переход на mailto: запрещён политикой страницы,
+                    и приложение подменилось бы страницей ошибки — так же,
+                    как это было с tel: у кнопки «Позвонить».
+                  */}
                   <Button
                     size="l"
                     stretched
                     mode="secondary"
                     href={`mailto:${SUPPORT_EMAIL}`}
+                    target="_blank"
+                    rel="noreferrer"
                   >
                     Написать нам
                   </Button>

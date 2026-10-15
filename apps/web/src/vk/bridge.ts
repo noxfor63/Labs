@@ -7,6 +7,7 @@
  *   • VKWebAppGetUserInfo → UserInfo
  *   • VKWebAppGetPhoneNumber → { phone_number, sign, is_verified }
  *   • VKWebAppGetPersonalCard → PersonalCardData { phone?, email?, address? }
+ *   • VKWebAppCopyText { text } → { result: true }
  *   • событие VKWebAppUpdateConfig → ParentConfigData { appearance, scheme }
  *
  * Метода «открыть диалог с пользователем» в пакете нет, поэтому во
@@ -118,6 +119,21 @@ export async function fetchVkPhone(): Promise<string | null> {
   }
 
   return null;
+}
+
+/**
+ * Скопировать текст средствами клиента ВКонтакте.
+ *
+ * Запасной путь для кнопки «Скопировать номер»: во фрейме vk.com
+ * браузерный буфер обмена бывает закрыт политикой родителя, а клиент
+ * копирует сам, в своём окне. false — не вышло или мы не во ВКонтакте.
+ */
+export async function copyTextViaVk(text: string): Promise<boolean> {
+  if (!isInsideVk()) {
+    return false;
+  }
+  const result = await withTimeout(bridge.send('VKWebAppCopyText', { text }));
+  return result !== null && result.result;
 }
 
 function toColorScheme(appearance: ParentConfigData['appearance']): ColorSchemeType {
