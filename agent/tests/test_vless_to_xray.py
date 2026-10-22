@@ -5,10 +5,14 @@
 
 from __future__ import annotations
 
+import base64
 import importlib.util
+import io
 import json
 import subprocess
 import sys
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
@@ -84,3 +88,86 @@ def test_script_reads_key_from_stdin_and_writes_valid_json():
     assert config["outbounds"][0]["protocol"] == "vless"
     # Ключ не попадает в то, что видно на экране.
     assert UUID not in result.stderr and "127.0.0.1:10809" in result.stderr
+
+
+# ---------------------------------------------------------------- подписка
+
+KEY_NL = REALITY
+KEY_DE = (
+    f"vless://{UUID}@de.example.net:443?type=tcp&security=reality&pbk=DePublicKey&sni=www.google.com&fp=chrome"
+    "&flow=xtls-rprx-vision#%F0%9F%87%A9%F0%9F%87%AA%20Германия"
+)
+OTHER = "vmess://eyJhZGQiOiJ4In0=\nss://YWVzLTI1Ni1nY206cGFzcw@h.example:8388#ss"
+
+
+def encoded(text: str, *, urlsafe: bool = False, strip_padding: bool = False) -> bytes:
+    raw = (base64.urlsafe_b64encode if urlsafe else base64.b64encode)(text.encode())
+    return raw.rstrip(b"=") if strip_padding else raw
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        encoded(f"{KEY_NL}\n{KEY_DE}\n{OTHER}"),
+        encoded(f"{KEY_NL}\n{KEY_DE}\n{OTHER}", urlsafe=True, strip_padding=True),
+        f"{KEY_NL}\r\n{OTHER}\r\n{KEY_DE}\r\n".encode(),
+    ],
+    ids=["base64", "base64url-без-выравнивания", "обычный-текст"],
+)
+def test_subscription_yields_only_vless_keys(body):
+    keys = vless.parse_subscription(body)
+    assert sorted(keys) == sorted([KEY_NL, KEY_DE])
+
+
+def test_server_list_shows_names_not_secrets():
+    shown = vless.describe_key(KEY_DE)
+    assert shown == "🇩🇪 Германия · tcp+reality"
+    assert UUID not in shown and "de.example.net" not in shown
+
+
+def test_subscription_link_end_to_end(tmp_path):
+    body = encoded(f"{KEY_NL}\n{OTHER}\n{KEY_DE}")
+    agents = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def do_GET(self):
+            agents.append(self.headers.get("User-Agent"))
+            if self.path != "/sub/token":
+                self.send_response(404)
+                self.end_headers()
+                return
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    url = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT)], input=f"{url}/sub/token\n2\n", capture_output=True, text=True, check=True
+        )
+        missing = subprocess.run(
+            [sys.executable, str(SCRIPT)], input=f"{url}/sub/old\n", capture_output=True, text=True
+        )
+    finally:
+        server.shutdown()
+
+    config = json.loads(result.stdout)
+    assert config["outbounds"][0]["settings"]["vnext"][0]["address"] == "de.example.net"
+    assert "1. Нидерланды · tcp+reality" in result.stderr and "2. 🇩🇪 Германия" in result.stderr
+    assert UUID not in result.stderr and "/sub/token" not in result.stderr
+    assert agents[0].startswith("v2rayN")
+
+    assert missing.returncode == 1
+    assert "ошибкой 404" in missing.stderr and "/sub/old" not in missing.stderr
+
+
+def test_wrong_server_number_is_refused(monkeypatch):
+    monkeypatch.setattr(sys, "stdin", io.StringIO("7\n"))
+    with pytest.raises(vless.BadKey, match="от 1 до 2"):
+        vless.choose_key([KEY_NL, KEY_DE])

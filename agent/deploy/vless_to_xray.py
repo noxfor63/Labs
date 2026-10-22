@@ -10,7 +10,11 @@
 Ключ спрашивается скрытым вводом и никуда не печатается: ни в историю команд,
 ни на экран. Нужен только Python, без сторонних пакетов.
 
-    python3 vless_to_xray.py > /usr/local/etc/xray/config.json
+    python3 vless_to_xray.py > /tmp/xray.json
+
+Вместо ключа можно вставить ссылку подписки https://… — её выдают VPN-сервисы
+вместо отдельных ключей. Скрипт сам скачает подписку, покажет список
+серверов (только названия, без ключей) и соберёт конфиг из выбранного.
 
 Поддерживаются транспорты tcp, ws, grpc, httpupgrade и xhttp с защитой none,
 tls или reality — это почти все ключи, которые выдают VPN-сервисы.
@@ -18,9 +22,13 @@ tls или reality — это почти все ключи, которые вы�
 
 from __future__ import annotations
 
+import base64
+import binascii
 import getpass
 import json
 import sys
+import urllib.error
+import urllib.request
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
 
@@ -153,12 +161,95 @@ def build_config(key: str, port: int = PROXY_PORT) -> dict[str, Any]:
     }
 
 
-def main() -> int:
-    if sys.stdin.isatty():
-        key = getpass.getpass("Вставьте ключ vless:// (ввод не отображается) и нажмите Enter: ")
-    else:
-        key = sys.stdin.readline()
+# ---------------------------------------------------------------- подписка
+
+# Панели VPN-сервисов отдают по ссылке подписки разное в зависимости от того, кто спрашивает:
+# браузеру — страницу, клиенту v2rayN — список ключей в base64. Нам нужен список.
+SUBSCRIPTION_USER_AGENT = "v2rayN/7.0"
+
+
+def parse_subscription(body: bytes) -> list[str]:
+    """Тело подписки → ключи vless://. Бывает простым текстом и base64 — разбираем оба."""
+    text = body.decode("utf-8", errors="replace")
+    if "vless://" not in text:
+        compact = "".join(text.split())
+        padded = compact + "=" * (-len(compact) % 4)
+        for decode in (base64.b64decode, base64.urlsafe_b64decode):
+            try:
+                text = decode(padded).decode("utf-8", errors="replace")
+            except (binascii.Error, ValueError):
+                continue
+            if "vless://" in text:
+                break
+    return [line.strip() for line in text.splitlines() if line.strip().lower().startswith("vless://")]
+
+
+def fetch_subscription(url: str) -> list[str]:
+    request = urllib.request.Request(url.strip(), headers={"User-Agent": SUBSCRIPTION_USER_AGENT})
     try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            body = response.read()
+    except urllib.error.HTTPError as exc:
+        raise BadKey(f"сервис подписки ответил ошибкой {exc.code} — ссылка устарела или неверна") from None
+    except (urllib.error.URLError, TimeoutError, OSError):
+        raise BadKey("сервис подписки недоступен с этого сервера") from None
+    keys = parse_subscription(body)
+    if not keys:
+        raise BadKey(
+            "в подписке нет ключей VLESS. Скопируйте отдельный ключ vless:// в приложении VPN "
+            "(обычно «Поделиться» или «Скопировать ссылку» у сервера) и вставьте его"
+        )
+    return keys
+
+
+def describe_key(key: str) -> str:
+    """Название сервера и тип соединения — без секретов: ни идентификатора, ни адреса."""
+    parts = urlsplit(key.strip())
+    query = parse_qs(parts.query)
+    name = unquote(parts.fragment).strip() or "без названия"
+    network = _param(query, "type", "tcp")
+    security = _param(query, "security", "none")
+    return f"{name} · {network}+{security}"
+
+
+def _read_line(prompt: str, *, secret: bool = False) -> str:
+    """Подсказки — в stderr: stdout занят конфигом, который перенаправляют в файл."""
+    if sys.stdin.isatty():
+        if secret:
+            return getpass.getpass(prompt, stream=sys.stderr)
+        print(prompt, end="", file=sys.stderr, flush=True)
+    return sys.stdin.readline()
+
+
+def choose_key(keys: list[str]) -> str:
+    supported = []
+    for key in keys:
+        try:
+            build_config(key)
+        except BadKey:
+            continue
+        supported.append(key)
+    if not supported:
+        raise BadKey("ни один сервер подписки не поддерживается — нужен VLESS по tcp, ws, grpc, httpupgrade или xhttp")
+    if len(supported) == 1:
+        print(f"В подписке один подходящий сервер: {describe_key(supported[0])}", file=sys.stderr)
+        return supported[0]
+    print("Серверы в подписке (лучше всего проходит блокировки reality):", file=sys.stderr)
+    for number, key in enumerate(supported, start=1):
+        print(f"  {number}. {describe_key(key)}", file=sys.stderr)
+    answer = _read_line(f"Номер сервера [1–{len(supported)}]: ").strip()
+    if not answer.isdigit() or not 1 <= int(answer) <= len(supported):
+        raise BadKey(f"нужен номер от 1 до {len(supported)}")
+    return supported[int(answer) - 1]
+
+
+def main() -> int:
+    raw = _read_line(
+        "Вставьте ключ vless:// или ссылку подписки https://… (ввод не отображается) и нажмите Enter: ",
+        secret=True,
+    ).strip()
+    try:
+        key = choose_key(fetch_subscription(raw)) if raw.lower().startswith(("https://", "http://")) else raw
         config = build_config(key)
     except BadKey as exc:
         print(f"Не получилось: {exc}.", file=sys.stderr)

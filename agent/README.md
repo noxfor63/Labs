@@ -174,7 +174,8 @@ curl -sS -m 15 --socks5-hostname АДРЕС:ПОРТ --proxy-user ЛОГИН -o 
 # Официальный установщик Xray: бинарник в /usr/local/bin, служба xray
 bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
 
-# Конфиг из ключа. Ключ спрашивается скрытым вводом и никуда не печатается.
+# Конфиг из ключа vless:// или ссылки подписки https://… — спрашивается скрытым вводом.
+# По ссылке скрипт сам скачает подписку и предложит выбрать сервер (показывает только названия).
 python3 /opt/vk-rideshare/app/agent/deploy/vless_to_xray.py > /tmp/xray.json
 xray run -test -config /tmp/xray.json
 XUSER=$(systemctl show -p User --value xray); XUSER=${XUSER:-root}
