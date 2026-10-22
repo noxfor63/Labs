@@ -8,8 +8,10 @@ import { ERROR_CODE } from '@vk-rideshare/shared';
 
 import { prisma as defaultPrisma } from './db.js';
 import { env as defaultEnv, type AppEnv } from './env.js';
+import { getBuildInfo } from './lib/build-info.js';
 import { ApiError } from './lib/errors.js';
 import { authPlugin } from './plugins/auth.js';
+import { agentRoutes } from './routes/agent.js';
 import { meRoutes } from './routes/me.js';
 import { moderationRoutes } from './routes/moderation.js';
 import { reportRoutes } from './routes/reports.js';
@@ -141,7 +143,14 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     });
   });
 
-  fastify.get('/health', async () => ({ status: 'ok' }));
+  /*
+   * Версия и коммит — чтобы после выкатки одной командой проверить, что
+   * сервер действительно перезапустился на новом коде.
+   */
+  fastify.get('/health', async () => {
+    const build = getBuildInfo(env.APP_COMMIT);
+    return { status: 'ok', version: build.version, commit: build.commit };
+  });
 
   const writeRateLimit: RateLimitConfig =
     options.rateLimit ??
@@ -165,6 +174,15 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     },
     { prefix: '/api' },
   );
+
+  /*
+   * Агент канала — рядом с /api, а не внутри: проверка подписи запуска
+   * висит на всём /api, а у агента своя авторизация. Префикс тот же,
+   * чтобы адреса проходили через уже настроенный nginx без правок.
+   */
+  if (env.agentEnabled) {
+    await fastify.register(agentRoutes(deps), { prefix: '/api/agent' });
+  }
 
   return fastify;
 }

@@ -100,6 +100,22 @@ const envSchema = z
      * умолчанию: права, выданные по забывчивости, никто не отзывает.
      */
     MODERATOR_IDS: z.string().default(''),
+    /**
+     * Ключ агента канала — для адресов /api/agent/*.
+     *
+     * Агент читает отсюда, что выкачено, и обезличенный список поездок
+     * для дайджеста. Пусто — адреса не регистрируются вовсе: функция,
+     * которой нет, не может и протечь. Длина от 32 символов, потому что
+     * это единственная защита этих адресов.
+     */
+    AGENT_API_TOKEN: z
+      .string()
+      .default('')
+      .refine((value) => value === '' || value.length >= 32, {
+        message: 'AGENT_API_TOKEN — не короче 32 символов (openssl rand -hex 32)',
+      }),
+    /** Коммит выкаченного кода, если git на сервере недоступен. Обычно не нужен. */
+    APP_COMMIT: z.string().default(''),
   })
   .transform((raw) => {
     const isProduction = raw.NODE_ENV === 'production';
@@ -123,6 +139,8 @@ const envSchema = z
       moderators: parseModerators(raw.MODERATOR_IDS).ok,
       /** Записи MODERATOR_IDS, которые не удалось разобрать: о них говорят вслух. */
       moderatorsRejected: parseModerators(raw.MODERATOR_IDS).rejected,
+      /** Включены ли адреса агента канала. */
+      agentEnabled: raw.AGENT_API_TOKEN !== '',
     };
   })
   .refine((value) => !value.isProduction || value.VK_APP_SECRET.length > 0, {
