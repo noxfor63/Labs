@@ -140,9 +140,42 @@ curl -s https://vk-rideshare.duckdns.org/api/agent/status -H "Authorization: Bea
 
 ## Часть 3. Установка агента
 
-Ставить удобно туда же, где работает MetodiLabs: там уже открыт доступ к Telegram и к посреднику
-Claude. Агенты друг другу не мешают — у них разные боты, папки и службы. С сервера «По пути» Telegram
-недоступен, поэтому туда — не стоит.
+Агенту нужны четыре адреса: посредник Claude, GitHub, API «По пути» и `api.telegram.org`. Ставить
+можно на сам сервер «По пути» — первые три оттуда открыты, а Telegram пускается через ваш VPN (шаг 0).
+Или туда, где Telegram открыт и так, — тогда шаг 0 не нужен.
+
+### Шаг 0. Если сервер не видит Telegram — прокси через VLESS
+
+Проверка (от root):
+
+```bash
+curl -sS -m 10 -o /dev/null -w "telegram: %{http_code}\n" https://api.telegram.org
+```
+
+Трёхзначный код (`302`) — Telegram открыт, переходите к шагу 1. `000` — закрыт, тогда нужен VLESS-ключ.
+Ставим Xray — клиент VLESS — так, чтобы он открыл HTTP-прокси **только на 127.0.0.1**: снаружи его
+не видно, и ходит через него один агент, только в Telegram. Сервер и приложение работают напрямую.
+
+```bash
+# Официальный установщик Xray: бинарник в /usr/local/bin, служба xray
+bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
+
+# Конфиг из ключа. Ключ спрашивается скрытым вводом и никуда не печатается.
+python3 /opt/vk-rideshare/app/agent/deploy/vless_to_xray.py > /tmp/xray.json
+xray run -test -config /tmp/xray.json
+XUSER=$(systemctl show -p User --value xray); XUSER=${XUSER:-root}
+install -o root -g "$(id -gn "$XUSER")" -m 640 /tmp/xray.json /usr/local/etc/xray/config.json && rm /tmp/xray.json
+systemctl restart xray && systemctl is-active xray
+
+curl -sS -m 15 -x http://127.0.0.1:10809 -o /dev/null -w "telegram через прокси: %{http_code}\n" https://api.telegram.org
+```
+
+`xray run -test` должен ответить `Configuration OK.` (предупреждения об устаревшем транспорте — не
+ошибка), `is-active` — `active`, последняя команда — `302`. В `agent/.env` тогда:
+`TELEGRAM_PROXY=http://127.0.0.1:10809`.
+
+Права `640` и группа пользователя службы Xray: в конфиге ваш ключ, служба его прочитает, остальные
+пользователи сервера — нет.
 
 ### Шаг 1. Код
 
