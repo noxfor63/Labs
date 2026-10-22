@@ -25,3 +25,11 @@ apps/web/build.zip
 
 # Инструкция по выкатке конкретной установки — держится вне репозитория
 ВЫКАТКА.md
+
+# Агент канала: черновики, заметки и история чата — рабочие данные, не код
+agent/data/*
+!agent/data/.gitkeep
+agent/.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/

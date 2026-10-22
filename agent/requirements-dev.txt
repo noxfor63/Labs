@@ -1,0 +1,4 @@
+-r requirements.txt
+# Тесты (python -m pytest) и проверка стиля (ruff check .)
+pytest>=8
+ruff

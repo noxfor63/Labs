@@ -1,0 +1,15 @@
+[project]
+name = "po-puti-channel-agent"
+version = "0.1.0"
+description = "Агент канала «По пути»: готовит посты и публикует их только по согласованию владельца"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]

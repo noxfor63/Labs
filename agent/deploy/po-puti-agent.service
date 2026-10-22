@@ -1,0 +1,29 @@
+# Агент канала «По пути» как служба systemd.
+# Установка (от root), если проект лежит в /home/agent/Labs:
+#   cp /home/agent/Labs/agent/deploy/po-puti-agent.service /etc/systemd/system/
+#   systemctl daemon-reload && systemctl enable --now po-puti-agent
+# Пользователь и пути другие — поправьте User, Group и пути ниже.
+# Подробно — agent/README.md, часть 3.
+
+[Unit]
+Description=Po puti channel agent - Telegram bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=agent
+Group=agent
+WorkingDirectory=/home/agent/Labs/agent
+ExecStart=/home/agent/Labs/agent/.venv/bin/python -m channel_agent
+Restart=on-failure
+RestartSec=10
+Environment=PYTHONUNBUFFERED=1
+# Писать агенту можно только в свою папку data/ — черновики, заметки, история чата.
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/home/agent/Labs/agent/data
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
