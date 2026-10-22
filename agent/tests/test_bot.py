@@ -361,3 +361,10 @@ def test_scheduled_scan_turns_new_commits_into_a_card(telegram, run_bot, service
     assert "обновление" in shown["text"]
     first_request = services.store.pending()[0]
     assert first_request.commits == [c.sha for c in github.commits[3:]]
+
+
+@pytest.mark.parametrize("proxy", ["socks5h://login:p%40ss@127.0.0.1:1080", "http://127.0.0.1:10809"])
+def test_bot_builds_with_telegram_proxy(settings, services, proxy):
+    # SOCKS требует extra [socks] у python-telegram-bot: без него бот падает на запуске, а не на тестах.
+    bot = ChannelBot(dataclasses.replace(settings, telegram_proxy=proxy), services)
+    assert bot.build_application(TOKEN) is not None
