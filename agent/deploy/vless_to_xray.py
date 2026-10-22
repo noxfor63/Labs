@@ -25,14 +25,20 @@ from __future__ import annotations
 import base64
 import binascii
 import getpass
+import hashlib
 import json
+import re
+import socket
 import sys
 import urllib.error
 import urllib.request
+from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
 
 PROXY_PORT = 10809
+REALITY_PUBLIC_KEY = re.compile(r"[A-Za-z0-9_-]{43}")
+REALITY_SHORT_ID = re.compile(r"(?:[0-9a-fA-F]{2}){0,8}")
 NETWORKS = ("tcp", "ws", "grpc", "httpupgrade", "xhttp")
 SECURITIES = ("none", "tls", "reality")
 
@@ -74,12 +80,19 @@ def _stream_settings(query: dict[str, list[str]], host: str) -> dict[str, Any]:
         public_key = _param(query, "pbk")
         if not public_key:
             raise BadKey("в ключе reality нет открытого ключа сервера (параметр pbk)")
+        # Ключ x25519 в base64url — ровно 43 символа. Иное значит, что это не сервер, а заглушка.
+        if not REALITY_PUBLIC_KEY.fullmatch(public_key):
+            raise BadKey("открытый ключ сервера (pbk) неправильного вида")
+        short_id = _param(query, "sid")
+        # shortId — шестнадцатеричная строка чётной длины, до 16 знаков (так его проверяет Xray).
+        if not REALITY_SHORT_ID.fullmatch(short_id):
+            raise BadKey("короткий id сервера (sid) неправильного вида")
         reality: dict[str, Any] = {
             "serverName": sni,
             # Без отпечатка reality не работает; chrome — то, что ставят клиенты по умолчанию.
             "fingerprint": fingerprint or "chrome",
             "publicKey": public_key,
-            "shortId": _param(query, "sid"),
+            "shortId": short_id,
             "spiderX": _param(query, "spx"),
         }
         mldsa = _param(query, "pqv")
@@ -184,8 +197,34 @@ def parse_subscription(body: bytes) -> list[str]:
     return [line.strip() for line in text.splitlines() if line.strip().lower().startswith("vless://")]
 
 
+def device_id() -> str:
+    """Постоянный идентификатор этого сервера для сервиса подписки.
+
+    Часть VPN-сервисов считает устройства по заголовку x-hwid и без него ключ
+    не выдаёт. Берём machine-id системы, но не как есть, а хешем: сервису нужно
+    только узнавать сервер при повторных запросах, сам machine-id ему ни к чему.
+    Постоянство важно: каждый новый id занял бы ещё одно место в лимите устройств.
+    """
+    raw = ""
+    for path in ("/etc/machine-id", "/var/lib/dbus/machine-id"):
+        try:
+            raw = Path(path).read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+        if raw:
+            break
+    raw = raw or socket.gethostname()
+    return hashlib.sha256(f"po-puti-agent:{raw}".encode()).hexdigest()[:32]
+
+
 def fetch_subscription(url: str) -> list[str]:
-    request = urllib.request.Request(url.strip(), headers={"User-Agent": SUBSCRIPTION_USER_AGENT})
+    headers = {
+        "User-Agent": SUBSCRIPTION_USER_AGENT,
+        "x-hwid": device_id(),
+        "x-device-os": "Linux",
+        "x-device-model": "Server",
+    }
+    request = urllib.request.Request(url.strip(), headers=headers)
     try:
         with urllib.request.urlopen(request, timeout=20) as response:
             body = response.read()
@@ -230,7 +269,14 @@ def choose_key(keys: list[str]) -> str:
             continue
         supported.append(key)
     if not supported:
-        raise BadKey("ни один сервер подписки не поддерживается — нужен VLESS по tcp, ws, grpc, httpupgrade или xhttp")
+        # Ключей нет, а записи есть — обычно это сервис пишет о проблеме прямо в названиях:
+        # «Докупите устройства», «Подписка истекла». Показываем их — они и есть объяснение.
+        names = "; ".join(f"«{unquote(urlsplit(key.strip()).fragment).strip() or 'без названия'}»" for key in keys)
+        raise BadKey(
+            f"в подписке нет ни одного рабочего сервера, только записи: {names}. Так сервис обычно сообщает "
+            "о проблеме с подпиской — например, заняты все устройства или подписка истекла. Исправьте это "
+            "в боте или кабинете VPN и запустите скрипт снова"
+        )
     if len(supported) == 1:
         print(f"В подписке один подходящий сервер: {describe_key(supported[0])}", file=sys.stderr)
         return supported[0]

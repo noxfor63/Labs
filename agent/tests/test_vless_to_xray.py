@@ -25,7 +25,7 @@ spec.loader.exec_module(vless)
 UUID = "0f5e9e8c-1111-4a2b-9c3d-123456789abc"
 REALITY = (
     f"vless://{UUID}@vpn.example.net:443?type=tcp&security=reality&encryption=none"
-    "&flow=xtls-rprx-vision&sni=www.microsoft.com&fp=chrome&pbk=AbCdEfPublicKey123&sid=6ba85179e30d4fc2"
+    "&flow=xtls-rprx-vision&sni=www.microsoft.com&fp=chrome&pbk=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAabc&sid=6ba85179e30d4fc2"
     "&spx=%2F#Нидерланды"
 )
 
@@ -44,7 +44,7 @@ def test_reality_vision_key_becomes_local_http_proxy():
     assert stream["realitySettings"] == {
         "serverName": "www.microsoft.com",
         "fingerprint": "chrome",
-        "publicKey": "AbCdEfPublicKey123",
+        "publicKey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAabc",
         "shortId": "6ba85179e30d4fc2",
         "spiderX": "/",
     }
@@ -61,7 +61,9 @@ def test_tls_websocket_key():
 def test_grpc_and_xhttp_keys():
     grpc = vless.build_config(f"vless://{UUID}@h.example:443?type=grpc&security=tls&serviceName=tun&mode=multi")
     assert grpc["outbounds"][0]["streamSettings"]["grpcSettings"] == {"serviceName": "tun", "multiMode": True}
-    xhttp = vless.build_config(f"vless://{UUID}@h.example:443?type=xhttp&security=reality&pbk=K&sni=s&path=%2Fx")
+    xhttp = vless.build_config(
+        f"vless://{UUID}@h.example:443?type=xhttp&security=reality&pbk=KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK&sni=s&path=%2Fx"
+    )
     assert xhttp["outbounds"][0]["streamSettings"]["xhttpSettings"]["path"] == "/x"
 
 
@@ -72,6 +74,9 @@ def test_grpc_and_xhttp_keys():
         ("vless://@h.example:443?security=none", "идентификатора"),
         (f"vless://{UUID}@h.example:443?type=kcp", "не поддерживается"),
         (f"vless://{UUID}@h.example:443?security=reality&sni=s", "pbk"),
+        (f"vless://{UUID}@h.example:443?security=reality&sni=s&pbk=short", "pbk"),
+        (f"vless://{UUID}@h.example:443?security=reality&sni=s&pbk={'P' * 43}&sid=honey", "sid"),
+        (f"vless://{UUID}@h.example:443?security=reality&sni=s&pbk={'P' * 43}&sid=abc", "sid"),
     ],
 )
 def test_bad_keys_are_explained_without_echoing_the_key(key, message):
@@ -94,7 +99,7 @@ def test_script_reads_key_from_stdin_and_writes_valid_json():
 
 KEY_NL = REALITY
 KEY_DE = (
-    f"vless://{UUID}@de.example.net:443?type=tcp&security=reality&pbk=DePublicKey&sni=www.google.com&fp=chrome"
+    f"vless://{UUID}@de.example.net:443?type=tcp&security=reality&pbk=DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD&sni=www.google.com&fp=chrome"
     "&flow=xtls-rprx-vision#%F0%9F%87%A9%F0%9F%87%AA%20Германия"
 )
 OTHER = "vmess://eyJhZGQiOiJ4In0=\nss://YWVzLTI1Ni1nY206cGFzcw@h.example:8388#ss"
@@ -134,7 +139,8 @@ def test_subscription_link_end_to_end(tmp_path):
             pass
 
         def do_GET(self):
-            agents.append(self.headers.get("User-Agent"))
+            # Заголовки HTTP регистронезависимы; urllib пишет «X-hwid», сервису это всё равно.
+            agents.append({name: self.headers.get(name) for name in ("User-Agent", "x-hwid")})
             if self.path != "/sub/token":
                 self.send_response(404)
                 self.end_headers()
@@ -161,7 +167,9 @@ def test_subscription_link_end_to_end(tmp_path):
     assert config["outbounds"][0]["settings"]["vnext"][0]["address"] == "de.example.net"
     assert "1. Нидерланды · tcp+reality" in result.stderr and "2. 🇩🇪 Германия" in result.stderr
     assert UUID not in result.stderr and "/sub/token" not in result.stderr
-    assert agents[0].startswith("v2rayN")
+    assert agents[0]["User-Agent"].startswith("v2rayN")
+    # Идентификатор устройства постоянный: повторный запуск не займёт ещё одно место в лимите.
+    assert len(agents[0]["x-hwid"]) == 32 and agents[0]["x-hwid"] == agents[1]["x-hwid"]
 
     assert missing.returncode == 1
     assert "ошибкой 404" in missing.stderr and "/sub/old" not in missing.stderr
@@ -171,3 +179,15 @@ def test_wrong_server_number_is_refused(monkeypatch):
     monkeypatch.setattr(sys, "stdin", io.StringIO("7\n"))
     with pytest.raises(vless.BadKey, match="от 1 до 2"):
         vless.choose_key([KEY_NL, KEY_DE])
+
+
+def test_stub_subscription_explains_itself():
+    # Так выглядит подписка, в которой заняты все устройства: вместо сервера — запись-сообщение.
+    stub = (
+        f"vless://{UUID}@0.0.0.0:1?type=tcp&security=reality&pbk={'P' * 43}&sid=honey"
+        "#%F0%9F%8D%AF%20Докупите%20или%20удалите%20устройства"
+    )
+    with pytest.raises(vless.BadKey, match="Докупите или удалите устройства") as error:
+        vless.choose_key([stub])
+    assert "заняты все устройства" in str(error.value)
+    assert UUID not in str(error.value)
